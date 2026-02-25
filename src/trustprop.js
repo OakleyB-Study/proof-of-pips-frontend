@@ -14,6 +14,7 @@ import Badge from './components/Badge';
 import SkeletonRow from './components/SkeletonRow';
 import AdBox, { MobileAdCarousel } from './components/AdBox';
 import AddTraderModal from './components/AddTraderModal';
+import ReauthModal from './components/ReauthModal';
 import AdvertiseModal from './components/AdvertiseModal';
 import GlobalStyles from './components/GlobalStyles';
 
@@ -48,6 +49,7 @@ const ProofOfPipsContent = () => {
   const [twitterUsername, setTwitterUsername] = useState('');
   const [authToken, setAuthToken] = useState('');
   const [isVerified, setIsVerified] = useState(false);
+  const [showReauthModal, setShowReauthModal] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedTraders, setSelectedTraders] = useState([]);
   const [filterFirm, setFilterFirm] = useState('all');
@@ -130,7 +132,22 @@ const ProofOfPipsContent = () => {
             setAuthToken(data.authToken);
             setTwitterUsername(user);
             setIsVerified(true);
-            setShowAddModal(true);
+
+            // Check if this user already exists with expired auth → show re-auth modal
+            fetch(`${API_URL}/api/traders/${user}`)
+              .then(res => res.ok ? res.json() : null)
+              .then(trader => {
+                if (trader && trader.authStatus === 'expired') {
+                  setShowReauthModal(true);
+                } else if (trader) {
+                  showToast('This account is already registered.', 'info');
+                } else {
+                  setShowAddModal(true);
+                }
+              })
+              .catch(() => {
+                setShowAddModal(true);
+              });
           } else {
             showToast('Authentication failed. Please try again.', 'error');
           }
@@ -742,6 +759,9 @@ const ProofOfPipsContent = () => {
       {/* Modals */}
       {showAddModal && (
         <AddTraderModal onClose={() => setShowAddModal(false)} twitterUsername={twitterUsername} authToken={authToken} isVerified={isVerified} showToast={showToast} />
+      )}
+      {showReauthModal && (
+        <ReauthModal onClose={() => setShowReauthModal(false)} twitterUsername={twitterUsername} authToken={authToken} showToast={showToast} />
       )}
 
       {/* Comparison Modal */}

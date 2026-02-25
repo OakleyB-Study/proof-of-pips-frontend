@@ -172,7 +172,7 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
                   required
                   className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
-                <p className="text-xs text-gray-500 mt-1">Encrypted with AES-256 before storage</p>
+                <p className="text-xs text-gray-500 mt-1">Used once to generate an access token. Your password is never stored.</p>
               </div>
               <div>
                 <label className="block text-white font-semibold mb-2 text-sm">API Client ID <span className="text-gray-500">(optional)</span></label>
