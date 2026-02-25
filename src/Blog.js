@@ -109,8 +109,7 @@ Ready to put AMT into practice? Check out our verified prop trader leaderboard t
     readTime: '15 min read',
     category: 'Strategy'
   },
-  ,
-{
+  {
   id: 5,
   slug: 'chart-patterns-complete-guide',
   title: 'The Complete Chart Patterns Guide',

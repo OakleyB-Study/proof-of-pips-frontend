@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, useParams, useNavigate } from 'react-router-dom';
-import { Search, Plus, TrendingUp, Award, ExternalLink, ArrowLeft, Share2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, Plus, TrendingUp, Award, ExternalLink, ArrowLeft, Share2, AlertCircle, RefreshCw, ChevronDown, Shield, BarChart3, Download } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { mockTraders, mergeWithRealTraders } from './mockData';
+import { mergeWithRealTraders } from './mockData';
 import PrivacyPolicy from './PrivacyPolicy';
 import TermsOfService from './TermsOfService';
 import { calculateBadges, sortBadgesByPriority } from './badgeSystem';
@@ -52,6 +52,7 @@ const ProofOfPipsContent = () => {
   const [selectedTraders, setSelectedTraders] = useState([]);
   const [filterFirm, setFilterFirm] = useState('all');
   const [filterProfit, setFilterProfit] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Ad rotation every 8 seconds
   useEffect(() => {
@@ -84,11 +85,8 @@ const ProofOfPipsContent = () => {
         console.error('Error fetching traders:', err);
         setError(err.message);
         setLoading(false);
-        const tradersWithCharts = mockTraders.map(trader => ({
-          ...trader,
-          chartData: generateChartData(),
-        }));
-        setTraders(tradersWithCharts);
+        const allTraders = mergeWithRealTraders([], generateChartData);
+        setTraders(allTraders);
       });
   };
 
@@ -125,6 +123,11 @@ const ProofOfPipsContent = () => {
   }, [showToast]);
 
   const selectedTrader = username ? traders.find(t => t.twitter === username) : null;
+
+  // Memoize chart data so it doesn't regenerate on every render
+  const profileChartData = useMemo(() => {
+    return selectedTrader ? generateRealisticChartData(selectedTrader) : [];
+  }, [selectedTrader]);
 
   useEffect(() => {
     if (selectedTrader) {
@@ -211,12 +214,16 @@ const ProofOfPipsContent = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loading, traders.length]);
 
+  // Stats summary
+  const totalVerifiedProfit = traders.reduce((sum, t) => sum + (t.totalProfit || 0), 0);
+  const totalTraderCount = traders.length;
+
   // ============================================
   // PROFILE VIEW
   // ============================================
   if (selectedTrader) {
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-screen bg-[#0a0a0a]">
         <GlobalStyles />
         <Toast toast={toast} />
 
@@ -235,56 +242,53 @@ const ProofOfPipsContent = () => {
             </div>
 
             {/* Center Content - Profile */}
-            <div className="flex-1 max-w-5xl w-full mx-0 xl:mx-8">
+            <div className="flex-1 max-w-4xl w-full mx-auto xl:mx-8">
               <button
                 onClick={() => navigate('/')}
-                className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 mb-6 transition-colors"
+                className="inline-flex items-center gap-2 text-neutral-400 hover:text-white mb-8 transition-colors text-sm"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-4 h-4" />
                 Back to Leaderboard
               </button>
 
-              <div className="bg-neutral-900/50 backdrop-blur-sm border border-yellow-600/20 rounded-xl p-4 md:p-8 mb-6">
-                <div className="flex flex-col md:flex-row items-start justify-between mb-6 gap-4">
-                  <div className="flex items-center gap-3 md:gap-4 w-full md:w-auto">
-                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-neutral-800/50 flex items-center justify-center text-3xl md:text-4xl flex-shrink-0 border border-yellow-600/20">
+              {/* Profile Header Card */}
+              <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 md:p-8 mb-6 hover:border-neutral-700 transition-colors">
+                <div className="flex flex-col md:flex-row items-start justify-between mb-8 gap-6">
+                  <div className="flex items-center gap-4 md:gap-5 w-full md:w-auto">
+                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-neutral-800/80 flex items-center justify-center text-3xl md:text-4xl flex-shrink-0 border border-neutral-700">
                       {selectedTrader.avatar}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
-                        <h2 className="text-xl md:text-3xl font-bold text-white truncate">@{selectedTrader.twitter}</h2>
-                        <span className="bg-yellow-500/20 text-yellow-500 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-semibold flex items-center gap-1 whitespace-nowrap">
-                          &#10003; Verified
-                        </span>
-                        <span className="bg-neutral-800 text-white px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-semibold whitespace-nowrap">
-                          #{selectedTrader.rank}
+                        <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">@{selectedTrader.twitter}</h2>
+                        <span className="bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-md text-xs font-medium flex items-center gap-1 ring-1 ring-inset ring-emerald-500/20">
+                          <Shield className="w-3 h-3" /> Verified
                         </span>
                       </div>
-                      <p className="text-gray-400 text-sm md:text-base mb-2">
+                      <p className="text-neutral-400 text-sm md:text-base mb-3">
                         {selectedTrader.propFirmDisplay || 'Prop Trader'}
                         {selectedTrader.connectionType && (
-                          <span className="text-gray-600 ml-2 text-xs">
+                          <span className="text-neutral-600 ml-2 text-xs">
                             via {selectedTrader.connectionType === 'tradovate' ? 'Tradovate' : 'TradeSyncer'}
                           </span>
                         )}
                       </p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {sortBadgesByPriority(calculateBadges(selectedTrader)).map((badge, idx) => (
                           <Badge key={idx} badge={badge} />
                         ))}
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2 md:gap-3 w-full md:w-auto">
+                  <div className="flex gap-2 w-full md:w-auto">
                     <a
                       href={`https://twitter.com/${selectedTrader.twitter}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm md:text-base"
+                      className="flex-1 md:flex-none px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm border border-neutral-700"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      <span className="hidden sm:inline">Visit Twitter</span>
-                      <span className="sm:hidden">Twitter</span>
+                      <span className="hidden sm:inline">Twitter</span>
                     </a>
                     <button
                       onClick={async () => {
@@ -299,14 +303,14 @@ const ProofOfPipsContent = () => {
                           }
                         } catch { showToast('Network error. Try again.', 'error'); }
                       }}
-                      className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm md:text-base"
+                      className="flex-1 md:flex-none px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm border border-neutral-700"
                     >
                       <RefreshCw className="w-4 h-4" />
-                      <span className="hidden sm:inline">Refresh</span>
+                      <span className="hidden sm:inline">Sync</span>
                     </button>
                     <button
                       onClick={handleShare}
-                      className="flex-1 md:flex-none px-3 md:px-4 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-yellow-500/20 text-sm md:text-base"
+                      className="flex-1 md:flex-none px-4 py-2.5 bg-white hover:bg-neutral-200 text-black font-medium rounded-lg flex items-center justify-center gap-2 transition-all text-sm"
                     >
                       <Share2 className="w-4 h-4" />
                       Share
@@ -314,59 +318,58 @@ const ProofOfPipsContent = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                  <div className="bg-black p-3 md:p-4 rounded-lg border border-yellow-600/20">
-                    <p className="text-gray-400 text-xs md:text-sm mb-1">Total Profit</p>
-                    <p className="text-yellow-500 text-lg md:text-2xl font-bold">{formatCurrency(selectedTrader.totalProfit)}</p>
-                    <p className="text-gray-600 text-xs mt-1">All-time</p>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Total Profit</p>
+                    <p className="text-emerald-400 text-xl md:text-2xl font-bold font-mono">{formatCurrency(selectedTrader.totalProfit)}</p>
                   </div>
-                  <div className="bg-black p-3 md:p-4 rounded-lg border border-yellow-600/20">
-                    <p className="text-gray-400 text-xs md:text-sm mb-1">Last 30 days</p>
-                    <p className="text-white text-lg md:text-2xl font-bold">{formatCurrency(selectedTrader.monthlyProfit)}</p>
-                    <p className="text-gray-600 text-xs mt-1">Recent profit</p>
+                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Monthly</p>
+                    <p className="text-white text-xl md:text-2xl font-bold font-mono">{formatCurrency(selectedTrader.monthlyProfit)}</p>
                   </div>
-                  <div className="bg-black p-3 md:p-4 rounded-lg border border-yellow-600/20">
-                    <p className="text-gray-400 text-xs md:text-sm mb-1">Win Rate</p>
-                    <p className="text-white text-lg md:text-2xl font-bold">{selectedTrader.winRate}%</p>
-                    <p className="text-gray-600 text-xs mt-1">Success rate</p>
+                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Win Rate</p>
+                    <p className="text-white text-xl md:text-2xl font-bold font-mono">{selectedTrader.winRate}%</p>
                   </div>
-                  <div className="bg-black p-3 md:p-4 rounded-lg border border-yellow-600/20">
-                    <p className="text-gray-400 text-xs md:text-sm mb-1">Verified Since</p>
-                    <p className="text-white text-base md:text-lg font-bold">{formatDate(selectedTrader.accountCreated)}</p>
-                    <p className="text-gray-600 text-xs mt-1">Account creation</p>
+                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Since</p>
+                    <p className="text-white text-lg md:text-xl font-bold">{formatDate(selectedTrader.accountCreated)}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-neutral-900 backdrop-blur-sm border border-yellow-600/30 rounded-xl p-4 md:p-6">
-                <div className="flex items-center justify-between mb-4 md:mb-6">
-                  <h3 className="text-lg md:text-xl font-bold text-white">Performance</h3>
-                  <button className="px-2 md:px-3 py-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-black rounded-lg text-xs md:text-sm font-semibold">
+              {/* Performance Chart */}
+              <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 md:p-6 hover:border-neutral-700 transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-white">Performance</h3>
+                  <span className="px-3 py-1 bg-neutral-800 text-neutral-400 rounded-lg text-xs font-medium border border-neutral-700">
                     All time
-                  </button>
+                  </span>
                 </div>
                 <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={generateRealisticChartData(selectedTrader)}>
+                  <AreaChart data={profileChartData}>
                     <defs>
                       <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#EAB308" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#EAB308" stopOpacity={0} />
+                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
-                    <XAxis dataKey="month" stroke="#9CA3AF" />
-                    <YAxis stroke="#9CA3AF" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                    <XAxis dataKey="month" stroke="#525252" tick={{ fontSize: 12 }} />
+                    <YAxis stroke="#525252" tick={{ fontSize: 12 }} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#171717', border: '1px solid #404040', borderRadius: '8px' }}
+                      contentStyle={{ backgroundColor: '#171717', border: '1px solid #262626', borderRadius: '12px', fontSize: '13px' }}
                       formatter={(value) => formatCurrency(value)}
                     />
-                    <Area type="monotone" dataKey="profit" stroke="#EAB308" strokeWidth={2} fillOpacity={1} fill="url(#colorProfit)" />
+                    <Area type="monotone" dataKey="profit" stroke="#34d399" strokeWidth={2} fillOpacity={1} fill="url(#colorProfit)" />
                   </AreaChart>
                 </ResponsiveContainer>
-                <p className="text-gray-400 text-sm text-center mt-4">
-                  &#10003; All profit verified via {selectedTrader.connectionType === 'tradesyncer' ? 'TradeSyncer' : 'Tradovate'} API.
-                  Last updated: {formatTimestamp(selectedTrader.updatedAt)}
-                </p>
+                <div className="flex items-center justify-center gap-2 mt-4 text-neutral-500 text-xs">
+                  <Shield className="w-3 h-3" />
+                  All revenue verified through {selectedTrader.connectionType === 'tradesyncer' ? 'TradeSyncer' : 'Tradovate'} API
+                  {selectedTrader.updatedAt && <span className="text-neutral-600">| Updated {formatTimestamp(selectedTrader.updatedAt)}</span>}
+                </div>
               </div>
             </div>
 
@@ -391,224 +394,266 @@ const ProofOfPipsContent = () => {
   // LEADERBOARD VIEW
   // ============================================
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-[#0a0a0a]">
       <GlobalStyles />
       <Toast toast={toast} />
 
-      {/* Header */}
-      <header className="bg-neutral-950 border-b border-yellow-600/20 sticky top-0 z-50 backdrop-blur-sm">
-        <div className="px-2 md:px-4 py-3 md:py-4 max-w-[1800px] mx-auto">
-          <div className="flex items-center gap-3 md:gap-4">
-            <img src="/proof-of-pips-logo.png" alt="Proof of Pips Logo" className="w-10 h-10 md:w-14 md:h-14 object-contain" />
-            <div>
-              <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-[#D4AF37] to-[#C5A028] bg-clip-text text-transparent">
-                Proof of Pips
-              </h1>
-              <p className="text-[#D4AF37] text-xs md:text-sm font-medium">Verified Prop Trader Rankings</p>
-            </div>
+      {/* Minimal Header */}
+      <header className="sticky top-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-neutral-800/50">
+        <div className="px-4 py-3 max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+            <img src="/proof-of-pips-logo.png" alt="Proof of Pips" className="w-8 h-8 object-contain" />
+            <span className="text-white font-bold text-lg tracking-tight">Proof of Pips</span>
           </div>
+          <nav className="hidden md:flex items-center gap-1 text-sm text-neutral-500">
+            <button onClick={() => navigate('/')} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Leaderboard</button>
+            <span className="text-neutral-700">|</span>
+            <button onClick={() => navigate('/blog')} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Education</button>
+            <span className="text-neutral-700">|</span>
+            <button onClick={() => setShowAdvertiseModal(true)} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Advertise</button>
+          </nav>
+          <button
+            onClick={() => { window.location.href = `${API_URL}/api/auth/twitter/login`; }}
+            className="px-4 py-2 bg-white hover:bg-neutral-200 text-black text-sm font-medium rounded-lg transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Join</span>
+          </button>
         </div>
       </header>
 
       {/* Mobile Ad Carousel - Top */}
-      <div className="sticky top-[73px] md:top-[89px] z-40">
+      <div className="sticky top-[57px] z-40">
         <MobileAdCarousel position="top" />
       </div>
 
-      <div className="relative min-h-screen py-4 md:py-8">
+      <div className="relative min-h-screen">
         <div className="flex justify-between items-start px-2 md:px-4 max-w-[1800px] mx-auto">
           {/* Left Ads */}
-          <div className="hidden xl:flex flex-col gap-4 flex-shrink-0 sticky top-[100px] self-start">
+          <div className="hidden xl:flex flex-col gap-4 flex-shrink-0 sticky top-[80px] self-start pt-8">
             {[0, 1, 2, 3, 4].map(i => (
               <AdBox key={i} index={i} currentAdIndex={currentAdIndex} isRotating={isRotating} />
             ))}
           </div>
 
           {/* Center Content */}
-          <div className="flex-1 max-w-5xl w-full mx-0 xl:mx-8">
-            <div className="text-center mb-6 md:mb-12 px-2">
-              <h2 className="text-xl sm:text-2xl md:text-4xl font-bold text-white mb-2 md:mb-4">
-                The database of verified prop trader earnings
+          <div className="flex-1 max-w-5xl w-full mx-auto xl:mx-8 py-8 md:py-12 px-2">
+            {/* Hero */}
+            <div className="text-center mb-10 md:mb-16">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">
+                Verified prop trader earnings
               </h2>
-              <p className="text-gray-400 text-sm sm:text-base md:text-lg">
-                No more fake screenshots. Only verified profits from Tradovate &amp; TradeSyncer.
+              <p className="text-neutral-400 text-base md:text-lg max-w-2xl mx-auto mb-6">
+                No screenshots. No trust-me-bro. Revenue verified through Tradovate &amp; TradeSyncer APIs.
               </p>
-            </div>
 
-            {/* Search Bar & Actions */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 mb-4 md:mb-8">
-              <div className="flex-1 relative min-w-0">
-                <Search className="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4 md:w-5 md:h-5" />
-                <input
-                  type="text"
-                  placeholder="Search traders..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 md:pl-12 pr-3 md:pr-4 py-2 md:py-3 bg-neutral-900 border border-yellow-600/30 rounded-lg text-white text-sm md:text-base placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
-                />
+              {/* Trust Signals */}
+              <div className="flex items-center justify-center gap-4 md:gap-6 text-xs text-neutral-500">
+                <div className="flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>API Verified</span>
+                </div>
+                <span className="text-neutral-800">|</span>
+                <div className="flex items-center gap-1.5">
+                  <BarChart3 className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>{totalTraderCount} Traders</span>
+                </div>
+                <span className="text-neutral-800">|</span>
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="font-mono">{formatCurrency(totalVerifiedProfit)}</span>
+                  <span>Verified</span>
+                </div>
               </div>
-              <button
-                onClick={() => { window.location.href = `${API_URL}/api/auth/twitter/login`; }}
-                className="px-3 sm:px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-slate-900 text-sm md:text-base font-semibold rounded-lg flex items-center justify-center gap-1 md:gap-2 transition-all shadow-lg shadow-yellow-500/20 whitespace-nowrap"
-              >
-                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden xs:inline">Add</span>
-              </button>
-              <button
-                onClick={() => {
-                  const csv = ['Rank,Twitter,Total Profit,Win Rate,Monthly Profit,Prop Firm'];
-                  filteredAndSortedTraders.forEach(trader => {
-                    csv.push(`${trader.rank},@${trader.twitter},${trader.totalProfit},${trader.winRate}%,${trader.monthlyProfit},${trader.propFirmDisplay || ''}`);
-                  });
-                  const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `proof-of-pips-leaderboard-${new Date().toISOString().split('T')[0]}.csv`;
-                  a.click();
-                  showToast(`Exported ${filteredAndSortedTraders.length} traders!`, 'success');
-                }}
-                className="px-3 sm:px-4 md:px-6 py-2 md:py-3 bg-neutral-800 hover:bg-neutral-700 text-white text-sm md:text-base font-semibold rounded-lg flex items-center justify-center gap-1 md:gap-2 transition-colors whitespace-nowrap"
-              >
-                <TrendingUp className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden sm:inline">Export</span>
-              </button>
-              <button
-                onClick={() => { setCompareMode(!compareMode); if (compareMode) setSelectedTraders([]); }}
-                className={`px-3 sm:px-4 md:px-6 py-2 md:py-3 ${compareMode ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-white hover:bg-neutral-700'} text-sm md:text-base font-semibold rounded-lg flex items-center justify-center gap-1 md:gap-2 transition-all whitespace-nowrap`}
-              >
-                <Award className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden sm:inline">{compareMode ? 'Cancel' : 'Compare'}</span>
-              </button>
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap gap-2 mb-4 px-2">
-              <span className="text-gray-400 text-sm flex items-center">Filters:</span>
-              <select value={filterProfit} onChange={(e) => setFilterProfit(e.target.value)} className="px-3 py-1.5 bg-neutral-800 border border-yellow-600/30 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500 transition-colors cursor-pointer">
-                <option value="all">All Profits</option>
-                <option value="10k">$10K+</option>
-                <option value="50k">$50K+</option>
-                <option value="100k">$100K+</option>
-              </select>
-              <select value={filterFirm} onChange={(e) => setFilterFirm(e.target.value)} className="px-3 py-1.5 bg-neutral-800 border border-yellow-600/30 rounded-lg text-white text-sm focus:outline-none focus:border-yellow-500 transition-colors cursor-pointer">
-                <option value="all">All Firms</option>
-                <option value="topstep">Topstep</option>
-                <option value="apex">Apex Trader Funding</option>
-                <option value="tradeday">TradeDay</option>
-                <option value="bulenox">Bulenox</option>
-                <option value="tradeify">Tradeify</option>
-              </select>
-              {(filterProfit !== 'all' || filterFirm !== 'all') && (
-                <button onClick={() => { setFilterProfit('all'); setFilterFirm('all'); }} className="px-3 py-1.5 bg-neutral-700 hover:bg-neutral-600 text-white text-sm rounded-lg transition-colors">Clear</button>
-              )}
-            </div>
-
-            {/* Leaderboard Table */}
-            <div className="bg-neutral-900 backdrop-blur-sm border border-yellow-600/30 rounded-t-lg p-2 md:p-4">
-              <h3 className="text-base md:text-xl font-bold text-white flex items-center gap-2">
-                <Award className="w-4 h-4 md:w-6 md:h-6 text-yellow-500" />
-                Leaderboard
-              </h3>
-            </div>
-
-            <div className="bg-neutral-950 backdrop-blur-sm border-x border-b border-yellow-600/30 rounded-b-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-neutral-900">
-                    <tr>
-                      {compareMode && <th className="px-2 sm:px-4 md:px-6 py-2 md:py-4 text-left text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider w-12"><span className="sr-only">Select</span></th>}
-                      <th className="px-2 sm:px-4 md:px-6 py-2 md:py-4 text-left text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">#</th>
-                      <th className="px-2 sm:px-4 md:px-6 py-2 md:py-4 text-left text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider">Trader</th>
-                      <th className="px-2 sm:px-4 md:px-6 py-2 md:py-4 text-left text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => handleSort('totalProfit')}>
-                        <div className="flex items-center gap-1"><span>Profit</span>{sortBy === 'totalProfit' && <span>{sortDirection === 'asc' ? '\u2191' : '\u2193'}</span>}</div>
-                      </th>
-                      <th className="hidden sm:table-cell px-2 sm:px-4 md:px-6 py-2 md:py-4 text-left text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => handleSort('winRate')}>
-                        <div className="flex items-center gap-1"><span>Win Rate</span>{sortBy === 'winRate' && <span>{sortDirection === 'asc' ? '\u2191' : '\u2193'}</span>}</div>
-                      </th>
-                      <th className="hidden md:table-cell px-2 sm:px-4 md:px-6 py-2 md:py-4 text-left text-[10px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => handleSort('monthlyProfit')}>
-                        <div className="flex items-center gap-1"><span>Monthly</span>{sortBy === 'monthlyProfit' && <span>{sortDirection === 'asc' ? '\u2191' : '\u2193'}</span>}</div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-800">
-                    {loading ? (
-                      Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} />)
-                    ) : error ? (
-                      <tr>
-                        <td colSpan="5" className="px-6 py-12">
-                          <div className="flex flex-col items-center justify-center gap-4">
-                            <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center animate-pulse"><AlertCircle className="w-10 h-10 text-red-500" /></div>
-                            <div className="text-center max-w-md">
-                              <h3 className="text-white font-bold text-xl mb-2">Connection Lost</h3>
-                              <p className="text-gray-400 text-sm mb-4">We're having trouble reaching our servers.</p>
-                            </div>
-                            <button onClick={fetchTraders} className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-yellow-500/20"><RefreshCw className="w-4 h-4" /> Retry Connection</button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : filteredAndSortedTraders.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="px-6 py-12">
-                          <div className="flex flex-col items-center justify-center gap-4">
-                            <div className="w-20 h-20 rounded-full bg-yellow-500/10 flex items-center justify-center"><Search className="w-10 h-10 text-yellow-500" /></div>
-                            <div className="text-center max-w-md">
-                              <h3 className="text-white font-bold text-xl mb-2">{searchQuery ? 'No Traders Found' : 'Be a Pioneer'}</h3>
-                              <p className="text-gray-400 text-sm mb-3">{searchQuery ? `No one matching "${searchQuery}".` : 'Be the first verified prop trader to join.'}</p>
-                            </div>
-                            {searchQuery ? (
-                              <button onClick={() => setSearchQuery('')} className="px-6 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors">Clear Search</button>
-                            ) : (
-                              <button onClick={() => { window.location.href = `${API_URL}/api/auth/twitter/login`; }} className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-semibold rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-yellow-500/20"><Plus className="w-4 h-4" /> Join Leaderboard</button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredAndSortedTraders.map((trader) => (
-                        <tr key={trader.id || trader.twitter} onClick={compareMode ? undefined : () => navigate(`/profile/${trader.twitter}`)} className={`${compareMode ? '' : 'hover:bg-neutral-900/50 cursor-pointer'} transition-colors`}>
-                          {compareMode && (
-                            <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              <input type="checkbox" checked={selectedTraders.some(t => t.id === trader.id)} onChange={(e) => { e.stopPropagation(); toggleTraderSelection(trader); }} className="w-4 h-4 accent-yellow-500 cursor-pointer" />
-                            </td>
-                          )}
-                          <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4 whitespace-nowrap"><span className="text-base sm:text-lg md:text-xl font-bold text-white">{getRankEmoji(trader.rank)}</span></td>
-                          <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2 md:gap-3">
-                              <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full bg-neutral-800 flex items-center justify-center text-lg sm:text-xl md:text-2xl border border-yellow-600/20">{trader.avatar}</div>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1 md:gap-2 mb-1">
-                                  <span className="text-xs sm:text-sm md:text-base font-semibold text-white truncate">@{trader.twitter}</span>
-                                  <span className="text-[10px] sm:text-xs text-yellow-500">&#10003;</span>
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {sortBadgesByPriority(calculateBadges(trader)).slice(0, 2).map((badge, idx) => (
-                                    <Badge key={idx} badge={badge} />
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4 whitespace-nowrap"><span className="text-sm sm:text-base md:text-lg font-bold text-yellow-500">{formatCurrency(trader.totalProfit)}</span></td>
-                          <td className="hidden sm:table-cell px-2 sm:px-4 md:px-6 py-3 md:py-4 whitespace-nowrap"><span className="text-xs sm:text-sm md:text-base text-white font-semibold">{trader.winRate}%</span></td>
-                          <td className="hidden md:table-cell px-2 sm:px-4 md:px-6 py-3 md:py-4 whitespace-nowrap"><span className="text-xs sm:text-sm md:text-base text-gray-400">{formatCurrency(trader.monthlyProfit)}</span></td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+            {/* Search & Controls */}
+            <div className="flex flex-col gap-3 mb-6">
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-neutral-500 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Search traders..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-neutral-600 transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-all flex items-center gap-2 ${showFilters ? 'bg-neutral-800 border-neutral-600 text-white' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'}`}
+                >
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                  <span className="hidden sm:inline">Filter</span>
+                </button>
+                <button
+                  onClick={() => { setCompareMode(!compareMode); if (compareMode) setSelectedTraders([]); }}
+                  className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-all flex items-center gap-2 ${compareMode ? 'bg-white border-white text-black' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'}`}
+                >
+                  <Award className="w-4 h-4" />
+                  <span className="hidden sm:inline">{compareMode ? 'Cancel' : 'Compare'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const csv = ['Rank,Twitter,Total Profit,Win Rate,Monthly Profit,Prop Firm'];
+                    filteredAndSortedTraders.forEach(trader => {
+                      csv.push(`${trader.rank},@${trader.twitter},${trader.totalProfit},${trader.winRate}%,${trader.monthlyProfit},${trader.propFirmDisplay || ''}`);
+                    });
+                    const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `proof-of-pips-leaderboard-${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    showToast(`Exported ${filteredAndSortedTraders.length} traders!`, 'success');
+                  }}
+                  className="px-4 py-2.5 bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Export</span>
+                </button>
               </div>
 
-              {!loading && !error && filteredAndSortedTraders.length >= displayCount && (
-                <div className="p-4 md:p-6 text-center border-t border-neutral-800">
-                  <button onClick={() => setDisplayCount(prev => prev + 25)} className="px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black text-sm md:text-base font-semibold rounded-lg transition-all shadow-lg shadow-yellow-500/20">Load More</button>
+              {/* Expandable Filters */}
+              {showFilters && (
+                <div className="flex flex-wrap gap-2 p-4 bg-neutral-900/60 border border-neutral-800 rounded-xl animate-fade-in">
+                  <select value={filterProfit} onChange={(e) => setFilterProfit(e.target.value)} className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white text-sm focus:outline-none focus:border-neutral-500 cursor-pointer">
+                    <option value="all">All Profits</option>
+                    <option value="10k">$10K+</option>
+                    <option value="50k">$50K+</option>
+                    <option value="100k">$100K+</option>
+                  </select>
+                  <select value={filterFirm} onChange={(e) => setFilterFirm(e.target.value)} className="px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white text-sm focus:outline-none focus:border-neutral-500 cursor-pointer">
+                    <option value="all">All Firms</option>
+                    <option value="topstep">Topstep</option>
+                    <option value="apex">Apex Trader Funding</option>
+                    <option value="tradeday">TradeDay</option>
+                    <option value="bulenox">Bulenox</option>
+                    <option value="tradeify">Tradeify</option>
+                  </select>
+                  {(filterProfit !== 'all' || filterFirm !== 'all') && (
+                    <button onClick={() => { setFilterProfit('all'); setFilterFirm('all'); }} className="px-3 py-2 text-neutral-400 hover:text-white text-sm transition-colors">Clear all</button>
+                  )}
                 </div>
               )}
+            </div>
+
+            {/* Sort Controls */}
+            <div className="flex items-center gap-1 mb-4 text-xs text-neutral-600">
+              <span>Sort by:</span>
+              {[
+                { key: 'totalProfit', label: 'Profit' },
+                { key: 'winRate', label: 'Win Rate' },
+                { key: 'monthlyProfit', label: 'Monthly' },
+              ].map(col => (
+                <button
+                  key={col.key}
+                  onClick={() => handleSort(col.key)}
+                  className={`px-2 py-1 rounded-md transition-colors ${sortBy === col.key ? 'text-white bg-neutral-800' : 'hover:text-neutral-400'}`}
+                >
+                  {col.label} {sortBy === col.key && (sortDirection === 'asc' ? '\u2191' : '\u2193')}
+                </button>
+              ))}
+            </div>
+
+            {/* Leaderboard */}
+            <div className="space-y-2">
+              {loading ? (
+                <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl overflow-hidden">
+                  <table className="w-full">
+                    <tbody>
+                      {Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} />)}
+                    </tbody>
+                  </table>
+                </div>
+              ) : error && filteredAndSortedTraders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center"><AlertCircle className="w-8 h-8 text-red-400" /></div>
+                  <h3 className="text-white font-semibold text-lg">Connection Lost</h3>
+                  <p className="text-neutral-500 text-sm max-w-sm text-center">We're having trouble reaching our servers.</p>
+                  <button onClick={fetchTraders} className="px-5 py-2.5 bg-white hover:bg-neutral-200 text-black font-medium text-sm rounded-lg flex items-center gap-2 transition-all"><RefreshCw className="w-4 h-4" /> Retry</button>
+                </div>
+              ) : filteredAndSortedTraders.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-neutral-800 flex items-center justify-center"><Search className="w-8 h-8 text-neutral-500" /></div>
+                  <h3 className="text-white font-semibold text-lg">{searchQuery ? 'No Traders Found' : 'Be a Pioneer'}</h3>
+                  <p className="text-neutral-500 text-sm">{searchQuery ? `No one matching "${searchQuery}".` : 'Be the first verified prop trader to join.'}</p>
+                  {searchQuery ? (
+                    <button onClick={() => setSearchQuery('')} className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors">Clear Search</button>
+                  ) : (
+                    <button onClick={() => { window.location.href = `${API_URL}/api/auth/twitter/login`; }} className="px-5 py-2.5 bg-white hover:bg-neutral-200 text-black font-medium text-sm rounded-lg flex items-center gap-2 transition-all"><Plus className="w-4 h-4" /> Join Leaderboard</button>
+                  )}
+                </div>
+              ) : (
+                filteredAndSortedTraders.map((trader) => (
+                  <div
+                    key={trader.id || trader.twitter}
+                    onClick={compareMode ? undefined : () => navigate(`/profile/${trader.twitter}`)}
+                    className={`group bg-neutral-900/40 border border-neutral-800/60 rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 transition-all ${compareMode ? '' : 'hover:border-neutral-600 hover:bg-neutral-900/80 cursor-pointer'}`}
+                  >
+                    {/* Compare Checkbox */}
+                    {compareMode && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" checked={selectedTraders.some(t => t.id === trader.id)} onChange={(e) => { e.stopPropagation(); toggleTraderSelection(trader); }} className="w-4 h-4 accent-white cursor-pointer rounded" />
+                      </div>
+                    )}
+
+                    {/* Rank */}
+                    <div className="w-8 text-center flex-shrink-0">
+                      <span className="text-lg font-bold text-white">{getRankEmoji(trader.rank)}</span>
+                    </div>
+
+                    {/* Avatar */}
+                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-neutral-800 flex items-center justify-center text-xl md:text-2xl flex-shrink-0 border border-neutral-700/50 group-hover:border-neutral-600 transition-colors">
+                      {trader.avatar}
+                    </div>
+
+                    {/* Info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-sm md:text-base font-semibold text-white truncate group-hover:text-white transition-colors">@{trader.twitter}</span>
+                        <Shield className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {sortBadgesByPriority(calculateBadges(trader)).slice(0, 2).map((badge, idx) => (
+                          <Badge key={idx} badge={badge} />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Profit */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm md:text-base font-bold font-mono text-emerald-400">{formatCurrency(trader.totalProfit)}</p>
+                      <p className="text-[11px] text-neutral-600 font-mono hidden sm:block">{formatCurrency(trader.monthlyProfit)}/mo</p>
+                    </div>
+
+                    {/* Win Rate */}
+                    <div className="text-right flex-shrink-0 hidden sm:block w-16">
+                      <p className="text-sm font-semibold font-mono text-white">{trader.winRate}%</p>
+                      <p className="text-[11px] text-neutral-600">win rate</p>
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {!loading && !error && filteredAndSortedTraders.length >= displayCount && (
+                <div className="pt-4 text-center">
+                  <button onClick={() => setDisplayCount(prev => prev + 25)} className="px-6 py-2.5 border border-neutral-800 hover:border-neutral-600 text-white text-sm font-medium rounded-xl transition-all hover:bg-neutral-900/50 w-full">
+                    Load more traders
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Verification Notice */}
+            <div className="mt-12 text-center text-xs text-neutral-600">
+              All revenue is verified through Tradovate &amp; TradeSyncer API keys. Data is updated hourly.
             </div>
           </div>
 
           {/* Right Ads */}
-          <div className="hidden xl:flex flex-col gap-4 flex-shrink-0 sticky top-[100px] self-start">
+          <div className="hidden xl:flex flex-col gap-4 flex-shrink-0 sticky top-[80px] self-start pt-8">
             {[5, 6, 7, 8, 9].map(i => (
               <AdBox key={i} index={i} currentAdIndex={currentAdIndex} isRotating={isRotating} />
             ))}
@@ -619,29 +664,56 @@ const ProofOfPipsContent = () => {
       <MobileAdCarousel position="bottom" />
 
       {/* Footer */}
-      <footer className="hidden xl:block bg-neutral-950 border-t border-yellow-600/20 py-6 mt-8">
-        <div className="max-w-7xl mx-auto px-4 flex justify-center items-center gap-6 text-sm text-gray-400">
-          <span>&copy; 2025 Proof of Pips</span>
-          <span className="text-gray-700">|</span>
-          <button onClick={() => navigate('/blog')} className="hover:text-yellow-500 transition-colors">Education</button>
-          <span className="text-gray-700">|</span>
-          <button onClick={() => navigate('/privacy')} className="hover:text-yellow-500 transition-colors">Privacy Policy</button>
-          <span className="text-gray-700">|</span>
-          <button onClick={() => navigate('/terms')} className="hover:text-yellow-500 transition-colors">Terms of Service</button>
+      <footer className="border-t border-neutral-800/50 py-8 mt-16">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-3">Navigation</h4>
+              <div className="space-y-2">
+                <button onClick={() => navigate('/')} className="block text-neutral-500 hover:text-white text-sm transition-colors">Leaderboard</button>
+                <button onClick={() => navigate('/blog')} className="block text-neutral-500 hover:text-white text-sm transition-colors">Education</button>
+                <button onClick={() => setShowAdvertiseModal(true)} className="block text-neutral-500 hover:text-white text-sm transition-colors">Advertise</button>
+              </div>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-3">Integrations</h4>
+              <div className="space-y-2">
+                <span className="block text-neutral-500 text-sm">Tradovate</span>
+                <span className="block text-neutral-500 text-sm">TradeSyncer</span>
+              </div>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-3">Legal</h4>
+              <div className="space-y-2">
+                <button onClick={() => navigate('/privacy')} className="block text-neutral-500 hover:text-white text-sm transition-colors">Privacy Policy</button>
+                <button onClick={() => navigate('/terms')} className="block text-neutral-500 hover:text-white text-sm transition-colors">Terms of Service</button>
+              </div>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold text-sm mb-3">Connect</h4>
+              <div className="space-y-2">
+                <a href="https://twitter.com/proofofpips" target="_blank" rel="noopener noreferrer" className="block text-neutral-500 hover:text-white text-sm transition-colors">Twitter / X</a>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center justify-between pt-6 border-t border-neutral-800/50 gap-2">
+            <span className="text-neutral-600 text-xs">&copy; 2025 Proof of Pips. All revenue data verified.</span>
+            <div className="flex items-center gap-1.5 text-neutral-600 text-xs">
+              <Shield className="w-3 h-3 text-emerald-500" />
+              Powered by Tradovate &amp; TradeSyncer APIs
+            </div>
+          </div>
         </div>
       </footer>
 
       {/* Floating Compare Button */}
       {compareMode && selectedTraders.length >= 2 && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
-          <button onClick={() => setCompareMode(false)} className="px-8 py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-bold text-lg rounded-full flex items-center gap-3 transition-all shadow-2xl shadow-yellow-500/50 hover:scale-105">
-            <Award className="w-6 h-6" /> Compare {selectedTraders.length} Traders
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <button onClick={() => setCompareMode(false)} className="px-8 py-3.5 bg-white hover:bg-neutral-100 text-black font-bold text-sm rounded-full flex items-center gap-3 transition-all shadow-2xl shadow-white/10 hover:scale-105">
+            <Award className="w-5 h-5" /> Compare {selectedTraders.length} Traders
           </button>
         </div>
       )}
-
-      {/* Advertise Button */}
-      <button onClick={() => setShowAdvertiseModal(true)} className="fixed top-4 right-4 z-50 px-4 py-2 bg-black/40 backdrop-blur-md hover:bg-black/60 border border-yellow-600/30 hover:border-yellow-500/50 text-yellow-500 font-semibold text-sm rounded-lg transition-all">Advertise</button>
 
       {/* Modals */}
       {showAddModal && (
@@ -651,48 +723,52 @@ const ProofOfPipsContent = () => {
       {/* Comparison Modal */}
       {selectedTraders.length >= 2 && !compareMode && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[100] p-4 overflow-y-auto">
-          <div className="bg-neutral-900 border border-yellow-600/30 rounded-xl max-w-6xl w-full my-8">
-            <div className="sticky top-0 bg-neutral-900 border-b border-neutral-800 p-6 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Award className="w-6 h-6 text-yellow-500" /> Trader Comparison</h2>
-              <button onClick={() => setSelectedTraders([])} className="text-gray-400 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-6xl w-full my-8">
+            <div className="sticky top-0 bg-neutral-900 border-b border-neutral-800 p-6 flex justify-between items-center rounded-t-2xl">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Award className="w-5 h-5 text-emerald-400" /> Trader Comparison</h2>
+              <button onClick={() => setSelectedTraders([])} className="text-neutral-400 hover:text-white transition-colors p-1 hover:bg-neutral-800 rounded-lg">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="p-6">
-              <div className={`grid ${selectedTraders.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-4`}>
-                {selectedTraders.map((trader, index) => (
-                  <div key={trader.id} className="bg-black/50 border border-yellow-600/20 rounded-xl p-4">
-                    <div className="flex flex-col items-center mb-6 pb-4 border-b border-neutral-800">
-                      <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center text-3xl border border-yellow-600/20 mb-3">{trader.avatar}</div>
-                      <h3 className="text-xl font-bold text-white mb-1">@{trader.twitter}</h3>
-                      <span className="bg-neutral-800 text-white px-3 py-1 rounded-full text-sm font-semibold">Rank #{trader.rank}</span>
+              <div className={`grid ${selectedTraders.length === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'} gap-4`}>
+                {selectedTraders.map((trader, index) => {
+                  const chartData = generateRealisticChartData(trader);
+                  return (
+                    <div key={trader.id} className="bg-neutral-950/60 border border-neutral-800 rounded-xl p-5">
+                      <div className="flex flex-col items-center mb-6 pb-4 border-b border-neutral-800">
+                        <div className="w-14 h-14 rounded-xl bg-neutral-800 flex items-center justify-center text-2xl border border-neutral-700 mb-3">{trader.avatar}</div>
+                        <h3 className="text-lg font-bold text-white mb-1">@{trader.twitter}</h3>
+                        <span className="text-neutral-500 text-xs">Rank #{trader.rank}</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-baseline"><span className="text-neutral-500 text-xs">Total Profit</span><span className="text-emerald-400 text-xl font-bold font-mono">{formatCurrency(trader.totalProfit)}</span></div>
+                        <div className="flex justify-between items-baseline"><span className="text-neutral-500 text-xs">Monthly</span><span className="text-white text-lg font-bold font-mono">{formatCurrency(trader.monthlyProfit)}</span></div>
+                        <div className="flex justify-between items-baseline"><span className="text-neutral-500 text-xs">Win Rate</span><span className="text-white text-lg font-bold font-mono">{trader.winRate}%</span></div>
+                      </div>
+                      <div className="mt-4">
+                        <ResponsiveContainer width="100%" height={120}>
+                          <AreaChart data={chartData}>
+                            <defs><linearGradient id={`colorProfit${index}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#34d399" stopOpacity={0.2} /><stop offset="95%" stopColor="#34d399" stopOpacity={0} /></linearGradient></defs>
+                            <Area type="monotone" dataKey="profit" stroke="#34d399" strokeWidth={2} fillOpacity={1} fill={`url(#colorProfit${index})`} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <button onClick={() => { setSelectedTraders([]); navigate(`/profile/${trader.twitter}`); }} className="w-full mt-4 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors border border-neutral-700">View Profile</button>
                     </div>
-                    <div className="space-y-4">
-                      <div className="text-center"><p className="text-gray-400 text-xs mb-1">Total Profit</p><p className="text-yellow-500 text-2xl font-bold">{formatCurrency(trader.totalProfit)}</p></div>
-                      <div className="text-center"><p className="text-gray-400 text-xs mb-1">Monthly Profit</p><p className="text-white text-xl font-bold">{formatCurrency(trader.monthlyProfit)}</p></div>
-                      <div className="text-center"><p className="text-gray-400 text-xs mb-1">Win Rate</p><p className="text-white text-xl font-bold">{trader.winRate}%</p></div>
-                    </div>
-                    <div className="mt-6">
-                      <ResponsiveContainer width="100%" height={150}>
-                        <AreaChart data={generateRealisticChartData(trader)}>
-                          <defs><linearGradient id={`colorProfit${index}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#EAB308" stopOpacity={0.3} /><stop offset="95%" stopColor="#EAB308" stopOpacity={0} /></linearGradient></defs>
-                          <Area type="monotone" dataKey="profit" stroke="#EAB308" strokeWidth={2} fillOpacity={1} fill={`url(#colorProfit${index})`} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <button onClick={() => { setSelectedTraders([]); navigate(`/profile/${trader.twitter}`); }} className="w-full mt-4 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors">View Full Profile</button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <div className="mt-6 p-4 bg-gradient-to-r from-yellow-500/10 to-yellow-600/10 border border-yellow-500/30 rounded-lg">
+              <div className="mt-6 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
                 <div className="flex items-center justify-center gap-2">
-                  <Award className="w-5 h-5 text-yellow-500" />
-                  <span className="text-white font-bold">
-                    {selectedTraders[0].totalProfit > selectedTraders[1].totalProfit
-                      ? `@${selectedTraders[0].twitter} leads by ${formatCurrency(selectedTraders[0].totalProfit - selectedTraders[1].totalProfit)}`
-                      : selectedTraders[0].totalProfit < selectedTraders[1].totalProfit
-                      ? `@${selectedTraders[1].twitter} leads by ${formatCurrency(selectedTraders[1].totalProfit - selectedTraders[0].totalProfit)}`
-                      : 'Tied in total profit!'}
+                  <Award className="w-4 h-4 text-emerald-400" />
+                  <span className="text-white font-semibold text-sm">
+                    {(() => {
+                      const leader = [...selectedTraders].sort((a, b) => b.totalProfit - a.totalProfit)[0];
+                      const second = [...selectedTraders].sort((a, b) => b.totalProfit - a.totalProfit)[1];
+                      if (leader.totalProfit === second.totalProfit) return 'Tied in total profit!';
+                      return `@${leader.twitter} leads by ${formatCurrency(leader.totalProfit - second.totalProfit)}`;
+                    })()}
                   </span>
                 </div>
               </div>
