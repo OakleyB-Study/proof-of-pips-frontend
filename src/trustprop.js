@@ -101,24 +101,43 @@ const ProofOfPipsContent = () => {
     }
   }, [username]);
 
-  // Handle Twitter OAuth callback
+  // Handle Twitter OAuth callback (STIG: exchange code for token via POST, not URL)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('auth_token');
+    const code = params.get('code');
     const user = params.get('twitter_username');
     const err = params.get('error');
 
     if (err) {
       showToast(`Authentication failed: ${err}`, 'error');
+      window.history.replaceState({}, '', window.location.pathname);
       return;
     }
 
-    if (token && user) {
-      setAuthToken(token);
-      setTwitterUsername(user);
-      setIsVerified(true);
-      setShowAddModal(true);
+    if (code && user) {
+      // Clean URL immediately to prevent code leakage via referrer
       window.history.replaceState({}, '', window.location.pathname);
+
+      // Exchange short-lived code for auth token via secure POST
+      fetch(`${API_URL}/api/auth/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.authToken) {
+            setAuthToken(data.authToken);
+            setTwitterUsername(user);
+            setIsVerified(true);
+            setShowAddModal(true);
+          } else {
+            showToast('Authentication failed. Please try again.', 'error');
+          }
+        })
+        .catch(() => {
+          showToast('Authentication failed. Please try again.', 'error');
+        });
     }
   }, [showToast]);
 
