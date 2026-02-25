@@ -1,0 +1,18 @@
+export const sponsorAds = [
+  { name: 'Sponsor 1', description: '250K+ members trading community', url: 'https://whop.com/', logo: '\u{1F4CA}', color: 'bg-gradient-to-br from-cyan-900/40 via-blue-950/60 to-slate-950' },
+  { name: 'Sponsor 2', description: 'Professional options trading signals', url: 'https://whop.com/', logo: '\u{1F4BC}', color: 'bg-gradient-to-br from-purple-900/40 via-violet-950/60 to-slate-950' },
+  { name: 'Sponsor 3', description: 'Real-time alerts for stocks, options & crypto', url: 'https://whop.com/', logo: '\u{1F454}', color: 'bg-gradient-to-br from-emerald-900/40 via-teal-950/60 to-slate-950' },
+  { name: 'Sponsor 4', description: 'Elite education across all asset classes', url: 'https://whop.com/', logo: '\u{2708}\u{FE0F}', color: 'bg-gradient-to-br from-amber-900/40 via-orange-950/60 to-slate-950' },
+  { name: 'Sponsor 5', description: 'Institutional-level research & analysis', url: 'https://whop.com/', logo: '\u{1F48E}', color: 'bg-gradient-to-br from-rose-900/40 via-pink-950/60 to-slate-950' },
+  { name: 'Sponsor 6', description: 'Elite futures & options trading', url: 'https://whop.com/', logo: '\u{1F451}', color: 'bg-gradient-to-br from-indigo-900/40 via-blue-950/60 to-slate-950' },
+  { name: 'Sponsor 7', description: 'Advanced chart patterns & technical analysis', url: 'https://whop.com/', logo: '\u{1F4C8}', color: 'bg-gradient-to-br from-green-900/40 via-emerald-950/60 to-slate-950' },
+  { name: 'Sponsor 8', description: 'Momentum trading strategies that work', url: 'https://whop.com/', logo: '\u{1F680}', color: 'bg-gradient-to-br from-orange-900/40 via-red-950/60 to-slate-950' },
+  { name: 'Sponsor 9', description: 'Swing trading mastery program', url: 'https://whop.com/', logo: '\u{26A1}', color: 'bg-gradient-to-br from-yellow-900/40 via-amber-950/60 to-slate-950' },
+  { name: 'Sponsor 10', description: 'Day trading bootcamp & mentorship', url: 'https://whop.com/', logo: '\u{1F3AF}', color: 'bg-gradient-to-br from-red-900/40 via-rose-950/60 to-slate-950' },
+  { name: 'Sponsor 11', description: 'Algorithmic trading strategies', url: 'https://whop.com/', logo: '\u{1F916}', color: 'bg-gradient-to-br from-blue-900/40 via-indigo-950/60 to-slate-950' },
+  { name: 'Sponsor 12', description: 'Options flow & dark pool analysis', url: 'https://whop.com/', logo: '\u{1F30A}', color: 'bg-gradient-to-br from-teal-900/40 via-cyan-950/60 to-slate-950' },
+  { name: 'Sponsor 13', description: 'Crypto trading signals & education', url: 'https://whop.com/', logo: '\u{20BF}', color: 'bg-gradient-to-br from-orange-900/40 via-yellow-950/60 to-slate-950' },
+  { name: 'Sponsor 14', description: 'Market structure & order flow', url: 'https://whop.com/', logo: '\u{1F4C9}', color: 'bg-gradient-to-br from-gray-900/40 via-slate-950/60 to-slate-950' },
+  { name: 'Sponsor 15', description: 'Risk management & position sizing', url: 'https://whop.com/', logo: '\u{1F6E1}\u{FE0F}', color: 'bg-gradient-to-br from-slate-900/40 via-gray-950/60 to-slate-950' },
+  { name: 'Sponsor 16', description: 'Trading psychology & mindset coaching', url: 'https://whop.com/', logo: '\u{1F9E0}', color: 'bg-gradient-to-br from-violet-900/40 via-purple-950/60 to-slate-950' },
+];
