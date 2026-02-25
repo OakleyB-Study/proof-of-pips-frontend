@@ -338,7 +338,7 @@ const ProofOfPipsContent = () => {
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
                     <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Total Profit</p>
                     <p className="text-emerald-400 text-xl md:text-2xl font-bold font-mono">{formatCurrency(selectedTrader.totalProfit)}</p>
@@ -350,6 +350,11 @@ const ProofOfPipsContent = () => {
                   <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
                     <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Win Rate</p>
                     <p className="text-white text-xl md:text-2xl font-bold font-mono">{selectedTrader.winRate}%</p>
+                  </div>
+                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Accounts Linked</p>
+                    <p className="text-amber-400 text-xl md:text-2xl font-bold font-mono">{selectedTrader.totalAccountsLinked || 0}</p>
+                    <p className="text-neutral-600 text-[10px] mt-0.5">Lifetime total</p>
                   </div>
                   <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
                     <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Since</p>

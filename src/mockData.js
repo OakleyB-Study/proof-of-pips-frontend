@@ -350,10 +350,12 @@ export const mergeWithRealTraders = (realTraders, generateChartDataFunc) => {
     chartData: generateChartDataFunc()
   }));
   
-  // Add unique IDs to mock traders (use negative IDs to avoid conflicts)
+  // Add unique IDs and derived fields to mock traders
   const mockWithIds = mockTraders.map((trader, index) => ({
     ...trader,
-    id: `mock-${index}`, // Unique ID for each mock trader
+    id: `mock-${index}`,
+    // Simulate realistic account counts: higher earners tend to have more accounts
+    totalAccountsLinked: Math.max(1, Math.floor(trader.totalProfit / 8000) + Math.floor(Math.random() * 3)),
     chartData: generateChartDataFunc()
   }));
   
