@@ -175,14 +175,24 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
                 <p className="text-xs text-gray-500 mt-1">Encrypted with AES-256 before storage</p>
               </div>
               <div>
+                <label className="block text-white font-semibold mb-2 text-sm">API Client ID <span className="text-gray-500">(optional)</span></label>
+                <input
+                  type="text"
+                  name="tradovateClientId"
+                  placeholder="Tradovate API client ID (cid)"
+                  className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
+                />
+                <p className="text-xs text-gray-500 mt-1">Found in Tradovate API settings under your app credentials.</p>
+              </div>
+              <div>
                 <label className="block text-white font-semibold mb-2 text-sm">API Secret Key <span className="text-gray-500">(optional)</span></label>
                 <input
                   type="password"
                   name="tradovateSecretKey"
-                  placeholder="Tradovate API secret key"
+                  placeholder="Tradovate API secret key (sec)"
                   className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
-                <p className="text-xs text-gray-500 mt-1">Found in Tradovate API settings. Required for some account types.</p>
+                <p className="text-xs text-gray-500 mt-1">Paired with Client ID. Required for API key authentication.</p>
               </div>
             </>
           )}
