@@ -621,7 +621,9 @@ const ProofOfPipsContent = () => {
             <button onClick={() => setShowAdvertiseModal(true)} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Advertise</button>
           </nav>
           <div className="flex items-center gap-2">
-            {isLoggedIn && sessionUser ? (
+            {sessionLoading ? (
+              <div className="w-20 h-8 bg-neutral-800 rounded-lg animate-pulse" />
+            ) : isLoggedIn && sessionUser ? (
               <>
                 <span className="text-neutral-400 text-sm hidden sm:inline">@{twitterUsername}</span>
                 {sessionUser.isRegistered && !sessionUser.isLinked && (
