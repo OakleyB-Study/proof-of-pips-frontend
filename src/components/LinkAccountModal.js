@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Shield } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://proof-of-pips-backend-production.up.railway.app';
 
@@ -20,7 +21,7 @@ const PROP_FIRMS = [
   { value: 'other', label: 'Other' },
 ];
 
-const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showToast }) => {
+const LinkAccountModal = ({ onClose, twitterUsername, showToast }) => {
   const [connectionType, setConnectionType] = useState('tradovate');
   const [propFirm, setPropFirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -31,8 +32,6 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
 
     const formData = new FormData(e.target);
     const body = {
-      twitterUsername,
-      authToken,
       propFirm: formData.get('propFirm'),
       connectionType,
     };
@@ -47,7 +46,7 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/traders/add`, {
+      const response = await fetch(`${API_URL}/api/traders/link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -57,11 +56,11 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
       const result = await response.json();
 
       if (response.ok) {
-        showToast('Profile added successfully! Syncing your stats...', 'success');
+        showToast('Account linked successfully! Syncing your stats...', 'success');
         onClose();
         setTimeout(() => window.location.reload(), 2000);
       } else {
-        showToast(result.error || 'Failed to add profile', 'error');
+        showToast(result.error || 'Failed to link account', 'error');
       }
     } catch (error) {
       showToast('Network error. Please try again.', 'error');
@@ -74,7 +73,7 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-neutral-900 border border-yellow-600/30 rounded-xl p-6 md:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl md:text-2xl font-bold text-white">Join the Leaderboard</h3>
+          <h3 className="text-xl md:text-2xl font-bold text-white">Link Trading Account</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -82,27 +81,18 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
           </button>
         </div>
 
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
+          <p className="text-yellow-400 text-sm flex items-center gap-2">
+            <Shield className="w-4 h-4 flex-shrink-0" />
+            Linking as @{twitterUsername}
+          </p>
+        </div>
+
         <p className="text-gray-400 mb-6 text-sm">
-          Connect your Tradovate account or TradeSyncer API to display verified trading stats on the leaderboard.
+          Connect your Tradovate account or TradeSyncer API to verify your stats and appear on the ranked leaderboard.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Twitter Username (read-only, verified via OAuth) */}
-          <div>
-            <label className="block text-white font-semibold mb-2 text-sm">Twitter Username</label>
-            <input
-              type="text"
-              value={twitterUsername}
-              readOnly
-              className="w-full px-4 py-3 bg-neutral-700 border border-neutral-600 rounded-lg text-white cursor-not-allowed"
-            />
-            {isVerified && (
-              <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
-                <span>&#10003;</span> Verified via Twitter OAuth
-              </p>
-            )}
-          </div>
-
           {/* Prop Firm */}
           <div>
             <label className="block text-white font-semibold mb-2 text-sm">Prop Firm</label>
@@ -183,7 +173,6 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
                   placeholder="Tradovate API client ID (cid)"
                   className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
-                <p className="text-xs text-gray-500 mt-1">Found in Tradovate API settings under your app credentials.</p>
               </div>
               <div>
                 <label className="block text-white font-semibold mb-2 text-sm">API Secret Key <span className="text-gray-500">(optional)</span></label>
@@ -193,7 +182,6 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
                   placeholder="Tradovate API secret key (sec)"
                   className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
-                <p className="text-xs text-gray-500 mt-1">Paired with Client ID. Required for API key authentication.</p>
               </div>
             </>
           )}
@@ -222,7 +210,7 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
               submitting ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            {submitting ? 'Connecting...' : 'Add Profile & Sync Stats'}
+            {submitting ? 'Connecting...' : 'Link Account & Sync Stats'}
           </button>
           <p className="text-center mt-3">
             <a href="/guide" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-yellow-500 transition-colors">
@@ -235,4 +223,4 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
   );
 };
 
-export default AddTraderModal;
+export default LinkAccountModal;

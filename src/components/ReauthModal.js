@@ -20,6 +20,7 @@ const ReauthModal = ({ onClose, twitterUsername, authToken, showToast }) => {
       const response = await fetch(`${API_URL}/api/traders/reauth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(body),
       });
 

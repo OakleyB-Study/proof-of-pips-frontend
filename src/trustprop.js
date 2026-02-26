@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, useParams, useNavigate } from 'react-router-dom';
-import { Search, Plus, TrendingUp, Award, ExternalLink, ArrowLeft, Share2, AlertCircle, RefreshCw, ChevronDown, Shield, BarChart3, Download } from 'lucide-react';
+import { Search, Plus, TrendingUp, Award, ExternalLink, ArrowLeft, Share2, AlertCircle, RefreshCw, ChevronDown, Shield, BarChart3, Download, LogOut, Link } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { mergeWithRealTraders } from './mockData';
 import PrivacyPolicy from './PrivacyPolicy';
@@ -16,6 +16,8 @@ import SkeletonRow from './components/SkeletonRow';
 import AdBox, { MobileAdCarousel } from './components/AdBox';
 import AddTraderModal from './components/AddTraderModal';
 import ReauthModal from './components/ReauthModal';
+import PostAuthModal from './components/PostAuthModal';
+import LinkAccountModal from './components/LinkAccountModal';
 import AdvertiseModal from './components/AdvertiseModal';
 import GlobalStyles from './components/GlobalStyles';
 
@@ -51,6 +53,12 @@ const ProofOfPipsContent = () => {
   const [authToken, setAuthToken] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [showReauthModal, setShowReauthModal] = useState(false);
+  const [showPostAuthModal, setShowPostAuthModal] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sessionUser, setSessionUser] = useState(null); // { twitterUsername, twitterId, isRegistered, isLinked }
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [postAuthSubmitting, setPostAuthSubmitting] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedTraders, setSelectedTraders] = useState([]);
   const [filterFirm, setFilterFirm] = useState('all');
@@ -68,6 +76,70 @@ const ProofOfPipsContent = () => {
     }, 8000);
     return () => clearInterval(interval);
   }, []);
+
+  // Restore session from cookie on mount
+  useEffect(() => {
+    fetch(`${API_URL}/api/auth/me`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated) {
+          setIsLoggedIn(true);
+          setTwitterUsername(data.twitterUsername);
+          // Check if user has a trader profile and if it's linked
+          fetch(`${API_URL}/api/traders/${data.twitterUsername}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(trader => {
+              if (trader) {
+                const isLinked = trader.connectionType !== 'none' && trader.authStatus !== 'unlinked';
+                setSessionUser({
+                  twitterUsername: data.twitterUsername,
+                  twitterId: data.twitterId,
+                  isRegistered: true,
+                  isLinked,
+                });
+              } else {
+                setSessionUser({
+                  twitterUsername: data.twitterUsername,
+                  twitterId: data.twitterId,
+                  isRegistered: false,
+                  isLinked: false,
+                });
+              }
+              setSessionLoading(false);
+            })
+            .catch(() => {
+              setSessionUser({
+                twitterUsername: data.twitterUsername,
+                twitterId: data.twitterId,
+                isRegistered: false,
+                isLinked: false,
+              });
+              setSessionLoading(false);
+            });
+        } else {
+          setSessionLoading(false);
+        }
+      })
+      .catch(() => {
+        setSessionLoading(false);
+      });
+  }, []);
+
+  // Logout handler
+  const handleLogout = () => {
+    fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' })
+      .then(() => {
+        setIsLoggedIn(false);
+        setSessionUser(null);
+        setTwitterUsername('');
+        setAuthToken('');
+        setIsVerified(false);
+        showToast('Logged out successfully.', 'success');
+      })
+      .catch(() => {
+        showToast('Logout failed. Please try again.', 'error');
+      });
+  };
 
   // Fetch traders from API
   const fetchTraders = () => {
@@ -104,11 +176,14 @@ const ProofOfPipsContent = () => {
     }
   }, [username]);
 
-  // Handle Twitter OAuth callback (STIG: exchange code for token via POST, not URL)
+  // Handle Twitter OAuth callback
+  // New flow: backend redirects with ?auth=success&twitter_username=... and sets JWT cookie
+  // Legacy flow kept for backward compat: ?code=...&twitter_username=...
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
+    const authSuccess = params.get('auth');
     const user = params.get('twitter_username');
+    const code = params.get('code');
     const err = params.get('error');
 
     if (err) {
@@ -117,14 +192,49 @@ const ProofOfPipsContent = () => {
       return;
     }
 
+    // New cookie-based flow: auth=success means JWT cookie is already set
+    if (authSuccess === 'success' && user) {
+      window.history.replaceState({}, '', window.location.pathname);
+      setIsLoggedIn(true);
+      setTwitterUsername(user);
+      setIsVerified(true);
+
+      // Check if this user already has a trader profile
+      fetch(`${API_URL}/api/traders/${user}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(trader => {
+          if (trader && trader.authStatus === 'expired') {
+            setSessionUser({ twitterUsername: user, isRegistered: true, isLinked: false });
+            setShowReauthModal(true);
+          } else if (trader && trader.connectionType !== 'none') {
+            // Already registered and linked
+            setSessionUser({ twitterUsername: user, isRegistered: true, isLinked: true });
+            showToast(`Welcome back, @${user}!`, 'success');
+          } else if (trader && trader.connectionType === 'none') {
+            // Registered but not linked — offer to link
+            setSessionUser({ twitterUsername: user, isRegistered: true, isLinked: false });
+            showToast(`Welcome back, @${user}! You can link a trading account anytime.`, 'success');
+          } else {
+            // New user — show post-auth choice modal
+            setSessionUser({ twitterUsername: user, isRegistered: false, isLinked: false });
+            setShowPostAuthModal(true);
+          }
+        })
+        .catch(() => {
+          setSessionUser({ twitterUsername: user, isRegistered: false, isLinked: false });
+          setShowPostAuthModal(true);
+        });
+      return;
+    }
+
+    // Legacy exchange code flow (backward compat)
     if (code && user) {
-      // Clean URL immediately to prevent code leakage via referrer
       window.history.replaceState({}, '', window.location.pathname);
 
-      // Exchange short-lived code for auth token via secure POST
       fetch(`${API_URL}/api/auth/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ code }),
       })
         .then(res => res.json())
@@ -133,21 +243,21 @@ const ProofOfPipsContent = () => {
             setAuthToken(data.authToken);
             setTwitterUsername(user);
             setIsVerified(true);
+            setIsLoggedIn(true);
 
-            // Check if this user already exists with expired auth → show re-auth modal
             fetch(`${API_URL}/api/traders/${user}`)
               .then(res => res.ok ? res.json() : null)
               .then(trader => {
                 if (trader && trader.authStatus === 'expired') {
                   setShowReauthModal(true);
                 } else if (trader) {
-                  showToast('This account is already registered.', 'info');
+                  showToast('Welcome back!', 'success');
                 } else {
-                  setShowAddModal(true);
+                  setShowPostAuthModal(true);
                 }
               })
               .catch(() => {
-                setShowAddModal(true);
+                setShowPostAuthModal(true);
               });
           } else {
             showToast('Authentication failed. Please try again.', 'error');
@@ -186,6 +296,8 @@ const ProofOfPipsContent = () => {
       if (e.key === 'Escape') {
         setShowAddModal(false);
         setShowAdvertiseModal(false);
+        setShowPostAuthModal(false);
+        setShowLinkModal(false);
       }
     };
     window.addEventListener('keydown', handleKeyPress);
@@ -239,6 +351,10 @@ const ProofOfPipsContent = () => {
     .slice(0, displayCount)
     .map((trader, index) => ({ ...trader, rank: index + 1 }));
 
+  // Split traders into verified (linked) and unlinked
+  const verifiedTraders = filteredAndSortedTraders.filter(t => t.connectionType !== 'none' && t.authStatus !== 'unlinked');
+  const unlinkedTraders = filteredAndSortedTraders.filter(t => t.connectionType === 'none' || t.authStatus === 'unlinked');
+
   // Lazy loading
   useEffect(() => {
     const handleScroll = () => {
@@ -259,6 +375,9 @@ const ProofOfPipsContent = () => {
   // PROFILE VIEW
   // ============================================
   if (selectedTrader) {
+    const isUnlinked = selectedTrader.connectionType === 'none' || selectedTrader.authStatus === 'unlinked';
+    const isOwnProfile = isLoggedIn && twitterUsername === selectedTrader.twitter;
+
     return (
       <div className="min-h-screen bg-[#0a0a0a]">
         <GlobalStyles />
@@ -293,28 +412,36 @@ const ProofOfPipsContent = () => {
                 <div className="flex flex-col md:flex-row items-start justify-between mb-8 gap-6">
                   <div className="flex items-center gap-4 md:gap-5 w-full md:w-auto">
                     <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-neutral-800/80 flex items-center justify-center text-3xl md:text-4xl flex-shrink-0 border border-neutral-700">
-                      {selectedTrader.avatar}
+                      {selectedTrader.avatar || '?'}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
                         <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">@{selectedTrader.twitter}</h2>
-                        <span className="bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-md text-xs font-medium flex items-center gap-1 ring-1 ring-inset ring-emerald-500/20">
-                          <Shield className="w-3 h-3" /> Verified
-                        </span>
+                        {isUnlinked ? (
+                          <span className="bg-neutral-800 text-neutral-500 px-2.5 py-0.5 rounded-md text-xs font-medium flex items-center gap-1 ring-1 ring-inset ring-neutral-700">
+                            Not Linked
+                          </span>
+                        ) : (
+                          <span className="bg-emerald-500/10 text-emerald-400 px-2.5 py-0.5 rounded-md text-xs font-medium flex items-center gap-1 ring-1 ring-inset ring-emerald-500/20">
+                            <Shield className="w-3 h-3" /> Verified
+                          </span>
+                        )}
                       </div>
                       <p className="text-neutral-400 text-sm md:text-base mb-3">
-                        {selectedTrader.propFirmDisplay || 'Prop Trader'}
-                        {selectedTrader.connectionType && (
+                        {isUnlinked ? 'No trading platform linked' : (selectedTrader.propFirmDisplay || 'Prop Trader')}
+                        {!isUnlinked && selectedTrader.connectionType && (
                           <span className="text-neutral-600 ml-2 text-xs">
                             via {selectedTrader.connectionType === 'tradovate' ? 'Tradovate' : 'TradeSyncer'}
                           </span>
                         )}
                       </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {sortBadgesByPriority(calculateBadges(selectedTrader)).map((badge, idx) => (
-                          <Badge key={idx} badge={badge} />
-                        ))}
-                      </div>
+                      {!isUnlinked && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {sortBadgesByPriority(calculateBadges(selectedTrader)).map((badge, idx) => (
+                            <Badge key={idx} badge={badge} />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-2 w-full md:w-auto">
@@ -327,24 +454,35 @@ const ProofOfPipsContent = () => {
                       <ExternalLink className="w-4 h-4" />
                       <span className="hidden sm:inline">Twitter</span>
                     </a>
-                    <button
-                      onClick={async () => {
-                        showToast('Syncing stats...', 'success');
-                        try {
-                          const response = await fetch(`${API_URL}/api/sync/trader/${selectedTrader.twitter}`, { method: 'POST' });
-                          if (response.ok) {
-                            showToast('Stats synced! Refreshing...', 'success');
-                            setTimeout(() => window.location.reload(), 1500);
-                          } else {
-                            showToast('Sync failed. Try again later.', 'error');
-                          }
-                        } catch { showToast('Network error. Try again.', 'error'); }
-                      }}
-                      className="flex-1 md:flex-none px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm border border-neutral-700"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      <span className="hidden sm:inline">Sync</span>
-                    </button>
+                    {!isUnlinked && (
+                      <button
+                        onClick={async () => {
+                          showToast('Syncing stats...', 'success');
+                          try {
+                            const response = await fetch(`${API_URL}/api/sync/trader/${selectedTrader.twitter}`, { method: 'POST' });
+                            if (response.ok) {
+                              showToast('Stats synced! Refreshing...', 'success');
+                              setTimeout(() => window.location.reload(), 1500);
+                            } else {
+                              showToast('Sync failed. Try again later.', 'error');
+                            }
+                          } catch { showToast('Network error. Try again.', 'error'); }
+                        }}
+                        className="flex-1 md:flex-none px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm border border-neutral-700"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        <span className="hidden sm:inline">Sync</span>
+                      </button>
+                    )}
+                    {isOwnProfile && isUnlinked && (
+                      <button
+                        onClick={() => setShowLinkModal(true)}
+                        className="flex-1 md:flex-none px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-black font-medium rounded-lg flex items-center justify-center gap-2 transition-all text-sm"
+                      >
+                        <Link className="w-4 h-4" />
+                        Link Account
+                      </button>
+                    )}
                     <button
                       onClick={handleShare}
                       className="flex-1 md:flex-none px-4 py-2.5 bg-white hover:bg-neutral-200 text-black font-medium rounded-lg flex items-center justify-center gap-2 transition-all text-sm"
@@ -355,64 +493,85 @@ const ProofOfPipsContent = () => {
                   </div>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
-                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Total Profit</p>
-                    <p className="text-emerald-400 text-xl md:text-2xl font-bold font-mono">{formatCurrency(selectedTrader.totalProfit)}</p>
+                {/* Stats Grid (only for linked traders) */}
+                {isUnlinked ? (
+                  <div className="bg-neutral-950/40 border border-neutral-800 rounded-xl p-8 text-center">
+                    <AlertCircle className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
+                    <h4 className="text-white font-semibold mb-2">No Trading Stats Available</h4>
+                    <p className="text-neutral-500 text-sm mb-4">
+                      This trader hasn't linked a trading platform yet. Stats will appear once they connect Tradovate or TradeSyncer.
+                    </p>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => setShowLinkModal(true)}
+                        className="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-black font-medium text-sm rounded-lg transition-all inline-flex items-center gap-2"
+                      >
+                        <Link className="w-4 h-4" />
+                        Link Trading Account
+                      </button>
+                    )}
                   </div>
-                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
-                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Monthly</p>
-                    <p className="text-white text-xl md:text-2xl font-bold font-mono">{formatCurrency(selectedTrader.monthlyProfit)}</p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                      <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Total Profit</p>
+                      <p className="text-emerald-400 text-xl md:text-2xl font-bold font-mono">{formatCurrency(selectedTrader.totalProfit)}</p>
+                    </div>
+                    <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                      <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Monthly</p>
+                      <p className="text-white text-xl md:text-2xl font-bold font-mono">{formatCurrency(selectedTrader.monthlyProfit)}</p>
+                    </div>
+                    <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                      <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Win Rate</p>
+                      <p className="text-white text-xl md:text-2xl font-bold font-mono">{selectedTrader.winRate}%</p>
+                    </div>
+                    <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                      <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Accounts Linked</p>
+                      <p className="text-amber-400 text-xl md:text-2xl font-bold font-mono">{selectedTrader.totalAccountsLinked || 0}</p>
+                      <p className="text-neutral-600 text-[10px] mt-0.5">Lifetime total</p>
+                    </div>
+                    <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
+                      <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Since</p>
+                      <p className="text-white text-lg md:text-xl font-bold">{formatDate(selectedTrader.accountCreated)}</p>
+                    </div>
                   </div>
-                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
-                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Win Rate</p>
-                    <p className="text-white text-xl md:text-2xl font-bold font-mono">{selectedTrader.winRate}%</p>
-                  </div>
-                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
-                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Accounts Linked</p>
-                    <p className="text-amber-400 text-xl md:text-2xl font-bold font-mono">{selectedTrader.totalAccountsLinked || 0}</p>
-                    <p className="text-neutral-600 text-[10px] mt-0.5">Lifetime total</p>
-                  </div>
-                  <div className="bg-neutral-950/60 p-4 rounded-xl border border-neutral-800">
-                    <p className="text-neutral-500 text-xs font-medium uppercase tracking-wider mb-1">Since</p>
-                    <p className="text-white text-lg md:text-xl font-bold">{formatDate(selectedTrader.accountCreated)}</p>
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Performance Chart */}
-              <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 md:p-6 hover:border-neutral-700 transition-colors">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-white">Performance</h3>
-                  <span className="px-3 py-1 bg-neutral-800 text-neutral-400 rounded-lg text-xs font-medium border border-neutral-700">
-                    All time
-                  </span>
+              {/* Performance Chart (only for linked traders) */}
+              {!isUnlinked && (
+                <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-5 md:p-6 hover:border-neutral-700 transition-colors">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-white">Performance</h3>
+                    <span className="px-3 py-1 bg-neutral-800 text-neutral-400 rounded-lg text-xs font-medium border border-neutral-700">
+                      All time
+                    </span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={profileChartData}>
+                      <defs>
+                        <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#34d399" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+                      <XAxis dataKey="month" stroke="#525252" tick={{ fontSize: 12 }} />
+                      <YAxis stroke="#525252" tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#171717', border: '1px solid #262626', borderRadius: '12px', fontSize: '13px' }}
+                        formatter={(value) => formatCurrency(value)}
+                      />
+                      <Area type="monotone" dataKey="profit" stroke="#34d399" strokeWidth={2} fillOpacity={1} fill="url(#colorProfit)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                  <div className="flex items-center justify-center gap-2 mt-4 text-neutral-500 text-xs">
+                    <Shield className="w-3 h-3" />
+                    All revenue verified through {selectedTrader.connectionType === 'tradesyncer' ? 'TradeSyncer' : 'Tradovate'} API
+                    {selectedTrader.updatedAt && <span className="text-neutral-600">| Updated {formatTimestamp(selectedTrader.updatedAt)}</span>}
+                  </div>
                 </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={profileChartData}>
-                    <defs>
-                      <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#34d399" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                    <XAxis dataKey="month" stroke="#525252" tick={{ fontSize: 12 }} />
-                    <YAxis stroke="#525252" tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#171717', border: '1px solid #262626', borderRadius: '12px', fontSize: '13px' }}
-                      formatter={(value) => formatCurrency(value)}
-                    />
-                    <Area type="monotone" dataKey="profit" stroke="#34d399" strokeWidth={2} fillOpacity={1} fill="url(#colorProfit)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-                <div className="flex items-center justify-center gap-2 mt-4 text-neutral-500 text-xs">
-                  <Shield className="w-3 h-3" />
-                  All revenue verified through {selectedTrader.connectionType === 'tradesyncer' ? 'TradeSyncer' : 'Tradovate'} API
-                  {selectedTrader.updatedAt && <span className="text-neutral-600">| Updated {formatTimestamp(selectedTrader.updatedAt)}</span>}
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Right Ads */}
@@ -428,6 +587,11 @@ const ProofOfPipsContent = () => {
         </div>
 
         <MobileAdCarousel position="bottom" />
+
+        {/* Link Modal on profile page */}
+        {showLinkModal && (
+          <LinkAccountModal onClose={() => setShowLinkModal(false)} twitterUsername={twitterUsername} showToast={showToast} />
+        )}
       </div>
     );
   }
@@ -456,13 +620,46 @@ const ProofOfPipsContent = () => {
             <span className="text-neutral-700">|</span>
             <button onClick={() => setShowAdvertiseModal(true)} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Advertise</button>
           </nav>
-          <button
-            onClick={() => { window.location.href = `${API_URL}/api/auth/twitter/login`; }}
-            className="px-4 py-2 bg-white hover:bg-neutral-200 text-black text-sm font-medium rounded-lg transition-all flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Join</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {isLoggedIn && sessionUser ? (
+              <>
+                <span className="text-neutral-400 text-sm hidden sm:inline">@{twitterUsername}</span>
+                {sessionUser.isRegistered && !sessionUser.isLinked && (
+                  <button
+                    onClick={() => setShowLinkModal(true)}
+                    className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5"
+                  >
+                    <Link className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Link Account</span>
+                  </button>
+                )}
+                {!sessionUser.isRegistered && (
+                  <button
+                    onClick={() => setShowPostAuthModal(true)}
+                    className="px-3 py-2 bg-white hover:bg-neutral-200 text-black text-xs font-medium rounded-lg transition-all flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Complete Signup</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white text-sm rounded-lg transition-all flex items-center gap-1.5 border border-neutral-700"
+                  title="Logout"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => { window.location.href = `${API_URL}/api/auth/twitter/login`; }}
+                className="px-4 py-2 bg-white hover:bg-neutral-200 text-black text-sm font-medium rounded-lg transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Join</span>
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -630,55 +827,91 @@ const ProofOfPipsContent = () => {
                   )}
                 </div>
               ) : (
-                filteredAndSortedTraders.map((trader) => (
-                  <div
-                    key={trader.id || trader.twitter}
-                    onClick={compareMode ? undefined : () => navigate(`/profile/${trader.twitter}`)}
-                    className={`group bg-neutral-900/40 border border-neutral-800/60 rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 transition-all ${compareMode ? '' : 'hover:border-neutral-600 hover:bg-neutral-900/80 cursor-pointer'}`}
-                  >
-                    {/* Compare Checkbox */}
-                    {compareMode && (
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={selectedTraders.some(t => t.id === trader.id)} onChange={(e) => { e.stopPropagation(); toggleTraderSelection(trader); }} className="w-4 h-4 accent-white cursor-pointer rounded" />
+                <>
+                  {/* Verified Traders Section */}
+                  {verifiedTraders.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Shield className="w-4 h-4 text-emerald-500" />
+                        <h3 className="text-sm font-semibold text-white">Verified Traders</h3>
+                        <span className="text-xs text-neutral-600">({verifiedTraders.length})</span>
                       </div>
-                    )}
+                      {verifiedTraders.map((trader) => (
+                        <div
+                          key={trader.id || trader.twitter}
+                          onClick={compareMode ? undefined : () => navigate(`/profile/${trader.twitter}`)}
+                          className={`group bg-neutral-900/40 border border-neutral-800/60 rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 transition-all ${compareMode ? '' : 'hover:border-neutral-600 hover:bg-neutral-900/80 cursor-pointer'}`}
+                        >
+                          {compareMode && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <input type="checkbox" checked={selectedTraders.some(t => t.id === trader.id)} onChange={(e) => { e.stopPropagation(); toggleTraderSelection(trader); }} className="w-4 h-4 accent-white cursor-pointer rounded" />
+                            </div>
+                          )}
+                          <div className="w-8 text-center flex-shrink-0">
+                            <span className="text-lg font-bold text-white">{getRankEmoji(trader.rank)}</span>
+                          </div>
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-neutral-800 flex items-center justify-center text-xl md:text-2xl flex-shrink-0 border border-neutral-700/50 group-hover:border-neutral-600 transition-colors">
+                            {trader.avatar}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-sm md:text-base font-semibold text-white truncate group-hover:text-white transition-colors">@{trader.twitter}</span>
+                              <Shield className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {sortBadgesByPriority(calculateBadges(trader)).slice(0, 2).map((badge, idx) => (
+                                <Badge key={idx} badge={badge} />
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm md:text-base font-bold font-mono text-emerald-400">{formatCurrency(trader.totalProfit)}</p>
+                            <p className="text-[11px] text-neutral-600 font-mono hidden sm:block">{formatCurrency(trader.monthlyProfit)}/mo</p>
+                          </div>
+                          <div className="text-right flex-shrink-0 hidden sm:block w-16">
+                            <p className="text-sm font-semibold font-mono text-white">{trader.winRate}%</p>
+                            <p className="text-[11px] text-neutral-600">win rate</p>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
 
-                    {/* Rank */}
-                    <div className="w-8 text-center flex-shrink-0">
-                      <span className="text-lg font-bold text-white">{getRankEmoji(trader.rank)}</span>
-                    </div>
-
-                    {/* Avatar */}
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-neutral-800 flex items-center justify-center text-xl md:text-2xl flex-shrink-0 border border-neutral-700/50 group-hover:border-neutral-600 transition-colors">
-                      {trader.avatar}
-                    </div>
-
-                    {/* Info */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm md:text-base font-semibold text-white truncate group-hover:text-white transition-colors">@{trader.twitter}</span>
-                        <Shield className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                  {/* Not Linked Section */}
+                  {unlinkedTraders.length > 0 && (
+                    <>
+                      <div className={`flex items-center gap-2 ${verifiedTraders.length > 0 ? 'mt-8 mb-1' : 'mb-1'}`}>
+                        <AlertCircle className="w-4 h-4 text-neutral-500" />
+                        <h3 className="text-sm font-semibold text-neutral-400">Not Linked</h3>
+                        <span className="text-xs text-neutral-600">({unlinkedTraders.length})</span>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {sortBadgesByPriority(calculateBadges(trader)).slice(0, 2).map((badge, idx) => (
-                          <Badge key={idx} badge={badge} />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Profit */}
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm md:text-base font-bold font-mono text-emerald-400">{formatCurrency(trader.totalProfit)}</p>
-                      <p className="text-[11px] text-neutral-600 font-mono hidden sm:block">{formatCurrency(trader.monthlyProfit)}/mo</p>
-                    </div>
-
-                    {/* Win Rate */}
-                    <div className="text-right flex-shrink-0 hidden sm:block w-16">
-                      <p className="text-sm font-semibold font-mono text-white">{trader.winRate}%</p>
-                      <p className="text-[11px] text-neutral-600">win rate</p>
-                    </div>
-                  </div>
-                ))
+                      <p className="text-xs text-neutral-600 mb-2">These traders haven't linked a trading platform yet.</p>
+                      {unlinkedTraders.map((trader) => (
+                        <div
+                          key={trader.id || trader.twitter}
+                          onClick={() => navigate(`/profile/${trader.twitter}`)}
+                          className="group bg-neutral-900/20 border border-neutral-800/40 rounded-xl p-3 md:p-4 flex items-center gap-3 md:gap-4 transition-all hover:border-neutral-700 hover:bg-neutral-900/40 cursor-pointer opacity-70 hover:opacity-90"
+                        >
+                          <div className="w-8 text-center flex-shrink-0">
+                            <span className="text-lg text-neutral-600">-</span>
+                          </div>
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-neutral-800/50 flex items-center justify-center text-xl md:text-2xl flex-shrink-0 border border-neutral-800">
+                            {trader.avatar || '?'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-sm md:text-base font-semibold text-neutral-400 truncate">@{trader.twitter}</span>
+                            </div>
+                            <span className="text-[11px] text-neutral-600">Pending verification</span>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <span className="text-xs text-neutral-600 italic">No stats yet</span>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </>
               )}
 
               {!loading && !error && filteredAndSortedTraders.length >= displayCount && (
@@ -766,6 +999,71 @@ const ProofOfPipsContent = () => {
       )}
       {showReauthModal && (
         <ReauthModal onClose={() => setShowReauthModal(false)} twitterUsername={twitterUsername} authToken={authToken} showToast={showToast} />
+      )}
+      {showPostAuthModal && (
+        <PostAuthModal
+          onClose={() => setShowPostAuthModal(false)}
+          twitterUsername={twitterUsername}
+          submitting={postAuthSubmitting}
+          onChooseLinkNow={() => {
+            setShowPostAuthModal(false);
+            // Register first (if not registered), then show AddTraderModal
+            if (!sessionUser?.isRegistered) {
+              setPostAuthSubmitting(true);
+              fetch(`${API_URL}/api/traders/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+              })
+                .then(res => res.json())
+                .then(data => {
+                  setPostAuthSubmitting(false);
+                  if (data.trader) {
+                    setSessionUser(prev => ({ ...prev, isRegistered: true }));
+                    // Now show link modal instead of add modal (since user is already registered with none)
+                    setShowLinkModal(true);
+                  } else {
+                    // If already registered, just show link modal
+                    setShowLinkModal(true);
+                  }
+                })
+                .catch(() => {
+                  setPostAuthSubmitting(false);
+                  // Still try to show add modal as fallback
+                  setShowAddModal(true);
+                });
+            } else {
+              setShowLinkModal(true);
+            }
+          }}
+          onChooseJoinOnly={() => {
+            setPostAuthSubmitting(true);
+            fetch(`${API_URL}/api/traders/register`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+            })
+              .then(res => res.json())
+              .then(data => {
+                setPostAuthSubmitting(false);
+                if (data.trader || data.error?.includes('already registered')) {
+                  setSessionUser(prev => ({ ...prev, isRegistered: true, isLinked: false }));
+                  showToast('Account created! You can link a trading platform anytime.', 'success');
+                  setShowPostAuthModal(false);
+                  fetchTraders(); // Refresh to show new unlinked trader
+                } else {
+                  showToast(data.error || 'Registration failed.', 'error');
+                }
+              })
+              .catch(() => {
+                setPostAuthSubmitting(false);
+                showToast('Network error. Please try again.', 'error');
+              });
+          }}
+        />
+      )}
+      {showLinkModal && (
+        <LinkAccountModal onClose={() => setShowLinkModal(false)} twitterUsername={twitterUsername} showToast={showToast} />
       )}
 
       {/* Comparison Modal */}
