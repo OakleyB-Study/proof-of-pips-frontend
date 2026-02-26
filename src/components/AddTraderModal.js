@@ -223,6 +223,11 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
           >
             {submitting ? 'Connecting...' : 'Add Profile & Sync Stats'}
           </button>
+          <p className="text-center mt-3">
+            <a href="/guide" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-yellow-500 transition-colors">
+              Need help? Read the setup guide →
+            </a>
+          </p>
         </form>
       </div>
     </div>

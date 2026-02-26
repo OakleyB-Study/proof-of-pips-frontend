@@ -7,6 +7,7 @@ import PrivacyPolicy from './PrivacyPolicy';
 import TermsOfService from './TermsOfService';
 import { calculateBadges, sortBadgesByPriority } from './badgeSystem';
 import { BlogListing, BlogPost } from './Blog';
+import Guide from './Guide';
 
 // Components
 import Toast from './components/Toast';
@@ -451,6 +452,8 @@ const ProofOfPipsContent = () => {
             <span className="text-neutral-700">|</span>
             <button onClick={() => navigate('/blog')} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Education</button>
             <span className="text-neutral-700">|</span>
+            <button onClick={() => navigate('/guide')} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">How to Join</button>
+            <span className="text-neutral-700">|</span>
             <button onClick={() => setShowAdvertiseModal(true)} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Advertise</button>
           </nav>
           <button
@@ -713,6 +716,7 @@ const ProofOfPipsContent = () => {
               <div className="space-y-2">
                 <button onClick={() => navigate('/')} className="block text-neutral-500 hover:text-white text-sm transition-colors">Leaderboard</button>
                 <button onClick={() => navigate('/blog')} className="block text-neutral-500 hover:text-white text-sm transition-colors">Education</button>
+                <button onClick={() => navigate('/guide')} className="block text-neutral-500 hover:text-white text-sm transition-colors">How to Join</button>
                 <button onClick={() => setShowAdvertiseModal(true)} className="block text-neutral-500 hover:text-white text-sm transition-colors">Advertise</button>
               </div>
             </div>
@@ -836,6 +840,7 @@ const ProofOfPips = () => (
       <Route path="/profile/:username" element={<ProofOfPipsContent />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
+      <Route path="/guide" element={<Guide />} />
       <Route path="/blog" element={<BlogListing />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
     </Routes>
