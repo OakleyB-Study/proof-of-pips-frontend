@@ -20,6 +20,7 @@ import PostAuthModal from './components/PostAuthModal';
 import LinkAccountModal from './components/LinkAccountModal';
 import AdvertiseModal from './components/AdvertiseModal';
 import GlobalStyles from './components/GlobalStyles';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Utils
 import { formatCurrency, formatDate, formatTimestamp, getRankEmoji } from './utils/formatters';
@@ -90,7 +91,9 @@ const ProofOfPipsContent = () => {
             .then(res => res.ok ? res.json() : null)
             .then(trader => {
               if (trader) {
-                const isLinked = trader.connectionType !== 'none' && trader.authStatus !== 'unlinked';
+                const ct = trader.connectionType || trader.connection_type;
+                const as = trader.authStatus || trader.auth_status;
+                const isLinked = ct !== 'none' && as !== 'unlinked';
                 setSessionUser({
                   twitterUsername: data.twitterUsername,
                   twitterId: data.twitterId,
@@ -352,8 +355,17 @@ const ProofOfPipsContent = () => {
     .map((trader, index) => ({ ...trader, rank: index + 1 }));
 
   // Split traders into verified (linked) and unlinked
-  const verifiedTraders = filteredAndSortedTraders.filter(t => t.connectionType !== 'none' && t.authStatus !== 'unlinked');
-  const unlinkedTraders = filteredAndSortedTraders.filter(t => t.connectionType === 'none' || t.authStatus === 'unlinked');
+  // connectionType/authStatus may be undefined for mock traders or if RPC returns snake_case fields
+  const verifiedTraders = filteredAndSortedTraders.filter(t => {
+    const ct = t.connectionType || t.connection_type;
+    const as = t.authStatus || t.auth_status;
+    return ct !== 'none' && as !== 'unlinked';
+  });
+  const unlinkedTraders = filteredAndSortedTraders.filter(t => {
+    const ct = t.connectionType || t.connection_type;
+    const as = t.authStatus || t.auth_status;
+    return ct === 'none' || as === 'unlinked';
+  });
 
   // Lazy loading
   useEffect(() => {
@@ -375,7 +387,7 @@ const ProofOfPipsContent = () => {
   // PROFILE VIEW
   // ============================================
   if (selectedTrader) {
-    const isUnlinked = selectedTrader.connectionType === 'none' || selectedTrader.authStatus === 'unlinked';
+    const isUnlinked = (selectedTrader.connectionType || selectedTrader.connection_type) === 'none' || (selectedTrader.authStatus || selectedTrader.auth_status) === 'unlinked';
     const isOwnProfile = isLoggedIn && twitterUsername === selectedTrader.twitter;
 
     return (
@@ -1008,8 +1020,7 @@ const ProofOfPipsContent = () => {
           twitterUsername={twitterUsername}
           submitting={postAuthSubmitting}
           onChooseLinkNow={() => {
-            setShowPostAuthModal(false);
-            // Register first (if not registered), then show AddTraderModal
+            // Register first (if not registered), then show LinkAccountModal
             if (!sessionUser?.isRegistered) {
               setPostAuthSubmitting(true);
               fetch(`${API_URL}/api/traders/register`, {
@@ -1020,21 +1031,21 @@ const ProofOfPipsContent = () => {
                 .then(res => res.json())
                 .then(data => {
                   setPostAuthSubmitting(false);
-                  if (data.trader) {
-                    setSessionUser(prev => ({ ...prev, isRegistered: true }));
-                    // Now show link modal instead of add modal (since user is already registered with none)
-                    setShowLinkModal(true);
-                  } else {
-                    // If already registered, just show link modal
-                    setShowLinkModal(true);
+                  setShowPostAuthModal(false);
+                  if (data.trader || data.error?.includes('already registered')) {
+                    setSessionUser(prev => prev ? { ...prev, isRegistered: true } : { twitterUsername, isRegistered: true, isLinked: false });
                   }
+                  // Show link modal regardless — user chose to link
+                  setShowLinkModal(true);
                 })
                 .catch(() => {
                   setPostAuthSubmitting(false);
-                  // Still try to show add modal as fallback
-                  setShowAddModal(true);
+                  setShowPostAuthModal(false);
+                  // Still show link modal as fallback
+                  setShowLinkModal(true);
                 });
             } else {
+              setShowPostAuthModal(false);
               setShowLinkModal(true);
             }
           }}
@@ -1045,11 +1056,16 @@ const ProofOfPipsContent = () => {
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
             })
-              .then(res => res.json())
+              .then(res => {
+                if (!res.ok && res.status === 401) {
+                  throw new Error('AUTH_FAILED');
+                }
+                return res.json();
+              })
               .then(data => {
                 setPostAuthSubmitting(false);
                 if (data.trader || data.error?.includes('already registered')) {
-                  setSessionUser(prev => ({ ...prev, isRegistered: true, isLinked: false }));
+                  setSessionUser(prev => prev ? { ...prev, isRegistered: true, isLinked: false } : { twitterUsername, isRegistered: true, isLinked: false });
                   showToast('Account created! You can link a trading platform anytime.', 'success');
                   setShowPostAuthModal(false);
                   fetchTraders(); // Refresh to show new unlinked trader
@@ -1057,9 +1073,14 @@ const ProofOfPipsContent = () => {
                   showToast(data.error || 'Registration failed.', 'error');
                 }
               })
-              .catch(() => {
+              .catch((err) => {
                 setPostAuthSubmitting(false);
-                showToast('Network error. Please try again.', 'error');
+                if (err.message === 'AUTH_FAILED') {
+                  showToast('Session expired. Please log in again.', 'error');
+                  setShowPostAuthModal(false);
+                } else {
+                  showToast('Network error. Please try again.', 'error');
+                }
               });
           }}
         />
@@ -1134,17 +1155,19 @@ const ProofOfPipsContent = () => {
 // APP WRAPPER WITH ROUTING
 // ============================================
 const ProofOfPips = () => (
-  <Router>
-    <Routes>
-      <Route path="/" element={<ProofOfPipsContent />} />
-      <Route path="/profile/:username" element={<ProofOfPipsContent />} />
-      <Route path="/privacy" element={<PrivacyPolicy />} />
-      <Route path="/terms" element={<TermsOfService />} />
-      <Route path="/guide" element={<Guide />} />
-      <Route path="/blog" element={<BlogListing />} />
-      <Route path="/blog/:slug" element={<BlogPost />} />
-    </Routes>
-  </Router>
+  <ErrorBoundary>
+    <Router>
+      <Routes>
+        <Route path="/" element={<ProofOfPipsContent />} />
+        <Route path="/profile/:username" element={<ProofOfPipsContent />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/guide" element={<Guide />} />
+        <Route path="/blog" element={<BlogListing />} />
+        <Route path="/blog/:slug" element={<BlogPost />} />
+      </Routes>
+    </Router>
+  </ErrorBoundary>
 );
 
 export default ProofOfPips;

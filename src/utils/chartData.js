@@ -9,12 +9,15 @@ export const generateChartData = () => {
 export const generateRealisticChartData = (trader) => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const currentMonth = new Date().getMonth();
-  const accountAge = new Date() - new Date(trader.accountCreated);
-  const monthsActive = Math.min(Math.ceil(accountAge / (30 * 24 * 60 * 60 * 1000)), 12);
+
+  // Safety: handle undefined/invalid values for unlinked traders
+  const accountCreated = trader.accountCreated || trader.account_created;
+  const accountAge = accountCreated ? (new Date() - new Date(accountCreated)) : 0;
+  const monthsActive = Math.min(Math.max(Math.ceil(accountAge / (30 * 24 * 60 * 60 * 1000)), 1), 12);
 
   const startMonth = Math.max(0, currentMonth - monthsActive + 1);
-  const finalProfit = trader.totalProfit;
-  const winRate = trader.winRate / 100;
+  const finalProfit = trader.totalProfit || trader.total_profit || 0;
+  const winRate = (trader.winRate || trader.win_rate || 50) / 100;
 
   const data = [];
 

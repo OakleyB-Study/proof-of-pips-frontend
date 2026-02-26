@@ -1,10 +1,11 @@
 export const formatCurrency = (amount) => {
+  const safeAmount = (typeof amount === 'number' && !isNaN(amount)) ? amount : 0;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(safeAmount);
 };
 
 export const formatDate = (dateString) => {
