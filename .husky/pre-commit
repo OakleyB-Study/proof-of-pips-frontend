@@ -1,0 +1,45 @@
+#!/bin/sh
+
+echo "🔍 Pre-commit checks..."
+
+# 1. Run backend tests
+echo "Running backend tests..."
+cd proof-of-pips-backend && node ./node_modules/jest/bin/jest.js --silent 2>&1
+BACKEND_EXIT=$?
+cd ..
+
+if [ $BACKEND_EXIT -ne 0 ]; then
+  echo "❌ Backend tests failed. Fix before committing."
+  exit 1
+fi
+echo "✅ Backend tests passed"
+
+# 2. Scan for hardcoded secrets in staged files
+echo "Scanning for secrets..."
+SECRETS_FOUND=0
+
+# Check for common secret patterns in staged JS files (excluding node_modules and tests)
+git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|json|env|yml|yaml)$' | grep -v node_modules | grep -v __tests__ | while read file; do
+  if [ -f "$file" ]; then
+    # Check for hardcoded API keys, passwords, secrets
+    if grep -nE '(password|secret|api_key|apiKey|token)\s*[:=]\s*['\''"][^'\''"]{8,}['\''"]' "$file" | grep -v 'process\.env' | grep -v 'require' | grep -v '\/\/' > /dev/null 2>&1; then
+      echo "⚠️  Possible hardcoded secret in: $file"
+      SECRETS_FOUND=1
+    fi
+  fi
+done
+
+if [ $SECRETS_FOUND -ne 0 ]; then
+  echo "❌ Possible secrets detected. Review flagged files."
+  exit 1
+fi
+echo "✅ No secrets detected"
+
+# 3. Check for .env files being committed
+if git diff --cached --name-only | grep -E '\.env$|\.env\.' > /dev/null 2>&1; then
+  echo "❌ .env file staged for commit. Remove it: git reset HEAD <file>"
+  exit 1
+fi
+echo "✅ No .env files staged"
+
+echo "✅ All pre-commit checks passed"
