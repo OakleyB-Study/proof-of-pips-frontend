@@ -161,6 +161,10 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
                   name="tradovateUsername"
                   placeholder="Your Tradovate username"
                   required
+                  autoComplete="username"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck="false"
                   className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
               </div>
@@ -171,6 +175,7 @@ const AddTraderModal = ({ onClose, twitterUsername, authToken, isVerified, showT
                   name="tradovatePassword"
                   placeholder="Your Tradovate password"
                   required
+                  autoComplete="current-password"
                   className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
                 <p className="text-xs text-gray-500 mt-1">Used once to generate an access token. Your password is never stored.</p>

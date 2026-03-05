@@ -3,11 +3,11 @@ import { Shield, ArrowRight } from 'lucide-react';
 
 const PostAuthModal = ({ onClose, twitterUsername, onChooseLinkNow, onChooseJoinOnly, submitting }) => {
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="post-auth-title">
       <div className="bg-neutral-900 border border-yellow-600/30 rounded-xl p-6 md:p-8 max-w-md w-full">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl md:text-2xl font-bold text-white">Welcome, @{twitterUsername}!</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+          <h3 id="post-auth-title" className="text-xl md:text-2xl font-bold text-white">Welcome, @{twitterUsername}!</h3>
+          <button onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-white transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

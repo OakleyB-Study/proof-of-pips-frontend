@@ -70,11 +70,11 @@ const LinkAccountModal = ({ onClose, twitterUsername, showToast }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="link-account-title">
       <div className="bg-neutral-900 border border-yellow-600/30 rounded-xl p-6 md:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl md:text-2xl font-bold text-white">Link Trading Account</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+          <h3 id="link-account-title" className="text-xl md:text-2xl font-bold text-white">Link Trading Account</h3>
+          <button onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-white transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -151,6 +151,10 @@ const LinkAccountModal = ({ onClose, twitterUsername, showToast }) => {
                   name="tradovateUsername"
                   placeholder="Your Tradovate username"
                   required
+                  autoComplete="username"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck="false"
                   className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
               </div>
@@ -161,6 +165,7 @@ const LinkAccountModal = ({ onClose, twitterUsername, showToast }) => {
                   name="tradovatePassword"
                   placeholder="Your Tradovate password"
                   required
+                  autoComplete="current-password"
                   className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors"
                 />
                 <p className="text-xs text-gray-500 mt-1">Used once to generate an access token. Your password is never stored.</p>

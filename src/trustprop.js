@@ -21,6 +21,7 @@ import LinkAccountModal from './components/LinkAccountModal';
 import AdvertiseModal from './components/AdvertiseModal';
 import GlobalStyles from './components/GlobalStyles';
 import ErrorBoundary from './components/ErrorBoundary';
+import CookieConsent from './components/CookieConsent';
 
 // Utils
 import { formatCurrency, formatDate, formatTimestamp, getRankEmoji } from './utils/formatters';
@@ -623,7 +624,7 @@ const ProofOfPipsContent = () => {
             <img src="/proof-of-pips-logo.png" alt="Proof of Pips" className="w-8 h-8 object-contain" />
             <span className="text-white font-bold text-lg tracking-tight">Proof of Pips</span>
           </div>
-          <nav className="hidden md:flex items-center gap-1 text-sm text-neutral-500">
+          <nav aria-label="Main navigation" className="hidden md:flex items-center gap-1 text-sm text-neutral-500">
             <button onClick={() => navigate('/')} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Leaderboard</button>
             <span className="text-neutral-700">|</span>
             <button onClick={() => navigate('/blog')} className="px-3 py-1.5 hover:text-white transition-colors rounded-lg hover:bg-neutral-800/50">Education</button>
@@ -726,20 +727,29 @@ const ProofOfPipsContent = () => {
             <div className="flex flex-col gap-3 mb-6">
               <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-neutral-500 w-4 h-4" />
+                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-neutral-500 w-4 h-4" aria-hidden="true" />
                   <input
-                    type="text"
+                    type="search"
+                    inputMode="search"
                     placeholder="Search traders..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search traders"
+                    role="searchbox"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
                     className="w-full pl-10 pr-4 py-2.5 bg-neutral-900 border border-neutral-800 rounded-xl text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-neutral-600 transition-colors"
                   />
                 </div>
                 <button
                   onClick={() => setShowFilters(!showFilters)}
+                  aria-label={showFilters ? 'Hide filters' : 'Show filters'}
+                  aria-expanded={showFilters}
                   className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-all flex items-center gap-2 ${showFilters ? 'bg-neutral-800 border-neutral-600 text-white' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'}`}
                 >
-                  <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} aria-hidden="true" />
                   <span className="hidden sm:inline">Filter</span>
                 </button>
                 <button
@@ -813,7 +823,7 @@ const ProofOfPipsContent = () => {
             </div>
 
             {/* Leaderboard */}
-            <div className="space-y-2">
+            <div className="space-y-2" role="list" aria-label="Trader leaderboard">
               {loading ? (
                 <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl overflow-hidden">
                   <table className="w-full">
@@ -1166,6 +1176,7 @@ const ProofOfPips = () => (
         <Route path="/blog" element={<BlogListing />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
       </Routes>
+      <CookieConsent />
     </Router>
   </ErrorBoundary>
 );
